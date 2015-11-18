@@ -68,6 +68,9 @@ class Boost(Package):
     
     depends_on('icu', when='+regex_icu')
     
+    depends_on('bzip2', when='+iostreams')
+    depends_on('zlib', when='+iostreams')
+    
     def url_for_version(self, version):
         """Handle Boost's weird URLs, which write the version two different ways."""
         parts = [str(p) for p in Version(version)]
