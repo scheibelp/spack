@@ -66,16 +66,6 @@ class Boost(Package):
 
     variant('regex_icu', default=False, description="Include regex ICU support (by default false even if regex library is compiled)")
     
-    #./b2 --prefix=$BOOST_ROOT -sNO_COMPRESSION=1 -sNO_ZLIB=1 -sNO_BZIP2=1 install
-    #boost depends on zlib when [iostreams library is specified] AND [the user
-    #hasn't specifically requested not to include ZLIB support]
-    # TODO: from what I can tell looking through libs/iostreams/test/Jamfile.v2
-    # it doesn't appear that these options modify the compilation rules, (they
-    # only appear to change whether some additional tests are run) so these libs 
-    # may still be required either way
-    variant('no_zlib', default=False, description="If iostreams library is included for compiling, disable default behavior of including zlib support")
-    variant('no_bzip2', default=False, description="")
-
     def url_for_version(self, version):
         """Handle Boost's weird URLs, which write the version two different ways."""
         parts = [str(p) for p in Version(version)]
