@@ -66,6 +66,8 @@ class Boost(Package):
 
     variant('regex_icu', default=False, description="Include regex ICU support (by default false even if regex library is compiled)")
     
+    depends_on('icu', when='+regex_icu')
+    
     def url_for_version(self, version):
         """Handle Boost's weird URLs, which write the version two different ways."""
         parts = [str(p) for p in Version(version)]
