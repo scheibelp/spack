@@ -1,4 +1,9 @@
 from spack import *
+from llnl.util.filesystem import install_tree, join_path
+import llnl.util.filesystem as FS
+import spack #TODO: not sure why this is required for build_env_path
+
+import os
 
 class Boost(Package):
     """Boost provides free peer-reviewed portable C++ source
@@ -43,6 +48,33 @@ class Boost(Package):
     version('1.34.1', '2d938467e8a448a2c9763e0a9f8ca7e5')
     version('1.34.0', 'ed5b9291ffad776f8757a916e1726ad0')
 
+    libs = ['chrono', 
+        'date_time', 
+        'filesystem', 
+        'iostreams', 
+        'program_options',
+        'random', 
+        'regex', 
+        'signals', 
+        'system', 
+        'thread', 
+        'wave']
+
+    for lib in libs:
+        variant(lib, default=False, description="compile with {0} library"
+            .format(lib))
+
+    variant('regex_icu', default=False, description="Include regex ICU support (by default false even if regex library is compiled)")
+    
+    #./b2 --prefix=$BOOST_ROOT -sNO_COMPRESSION=1 -sNO_ZLIB=1 -sNO_BZIP2=1 install
+    #boost depends on zlib when [iostreams library is specified] AND [the user
+    #hasn't specifically requested not to include ZLIB support]
+    # TODO: from what I can tell looking through libs/iostreams/test/Jamfile.v2
+    # it doesn't appear that these options modify the compilation rules, (they
+    # only appear to change whether some additional tests are run) so these libs 
+    # may still be required either way
+    variant('no_zlib', default=False, description="If iostreams library is included for compiling, disable default behavior of including zlib support")
+    variant('no_bzip2', default=False, description="")
 
     def url_for_version(self, version):
         """Handle Boost's weird URLs, which write the version two different ways."""
@@ -53,14 +85,50 @@ class Boost(Package):
             dots, underscores)
 
 
-    def install(self, spec, prefix):
+    def install(self, spec, prefix):   
+        withLibs = list()
+        for lib in Boost.libs:
+            if "+{0}".format(lib) in spec:
+                withLibs.append(lib)
+        if not withLibs:
+            # if no libraries are specified for compilation, then you dont have 
+            # to configure/build anything, just copy over to the prefix directory.
+            src = FS.join_path(self.stage.source_path, 'boost')
+            FS.mkdirp(FS.join_path(prefix, 'include'))
+            dst = FS.join_path(prefix, 'include', 'boost')
+            FS.install_tree(src, dst)
+            return
+        
+        # TODO: dependents may need to access the $BOOST_ROOT environment 
+        # variable - if we set it here will other packages see it? cmake appears
+        # to be able to set it automatically. Packages which use more basic 
+        # makefiles may require it to be set.
+    
         bootstrap = Executable('./bootstrap.sh')
-        bootstrap()
+        bootstrap('--prefix=%s' % prefix,
+            "--with-libraries=%s" % ','.join(withLibs))
 
         # b2 used to be called bjam, before 1.47 (sigh)
         b2name = './b2' if spec.satisfies('@1.47:') else './bjam'
 
+        # TODO: map compiler.name to Boost toolset config file (the Boost names
+        # don't always match the Spack names for compilers)
+        toolset = self.compiler.name
+
+        # TODO: map spec.architecture to b2's target-os option (this is mainly
+        # important for cross-compiling - Boost.Build has tools to determine
+        # architecture like Spack)
+        
+        # Edit user-config.jam & BOOST_BUILD_PATH to use specified compiler 
+        # (Boost.Build does not check the top-level boost directory for 
+        # user-config.jam unless it is in BOOST_BUILD_PATH)
+        env['BOOST_BUILD_PATH'] = os.getcwd()
+        compiler_wrapper = join_path(spack.build_env_path, 'cc')
+        with open('user-config.jam', 'wb') as F:
+            F.write("using {0} : : {1} ;".format(toolset, compiler_wrapper))
+
         b2 = Executable(b2name)
         b2('install',
            '-j %s' % make_jobs,
-           '--prefix=%s' % prefix)
+           '--prefix=%s' % prefix,
+           '--toolset=%s' % toolset)
