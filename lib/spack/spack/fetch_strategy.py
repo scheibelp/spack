@@ -139,6 +139,11 @@ class URLFetchStrategy(FetchStrategy):
         if self.archive_file:
             tty.msg("Already downloaded %s." % self.archive_file)
             return
+        cached = self.check_cache()
+        if cached:
+            tty.msg("Cached %s." % cached)
+            shutil.copy(cached, "./")
+            return
 
         tty.msg("Trying to fetch from %s" % self.url)
 
@@ -195,7 +200,8 @@ class URLFetchStrategy(FetchStrategy):
 
         if not self.archive_file:
             raise FailedDownloadError(self.url)
-
+        else:
+            shutil.copy(self.archive_file, spack.cache_path)
 
     @property
     def archive_file(self):
@@ -266,6 +272,16 @@ class URLFetchStrategy(FetchStrategy):
                 "%s checksum failed for %s." % (checker.hash_name, self.archive_file),
                 "Expected %s but got %s." % (self.digest, checker.sum))
 
+
+    def check_cache(self):
+        if not self.digest:
+            return
+        checker = crypto.Checker(self.digest)
+        paths = (join_path(spack.cache_path, f) for f in os.listdir(spack.cache_path))
+        for p in paths:
+            if checker.check(p):
+                return p
+        
 
     @_needs_stage
     def reset(self):

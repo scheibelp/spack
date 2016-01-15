@@ -43,6 +43,8 @@ hooks_path     = join_path(module_path, "hooks")
 var_path       = join_path(spack_root, "var", "spack")
 stage_path     = join_path(var_path, "stage")
 share_path     = join_path(spack_root, "share", "spack")
+cache_path     = join_path(spack_root, "var", "cache")
+mkdirp(cache_path)
 
 prefix = spack_root
 opt_path       = join_path(prefix, "opt")
