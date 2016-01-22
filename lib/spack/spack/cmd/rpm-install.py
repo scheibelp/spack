@@ -60,8 +60,10 @@ SOURCE0 : %{{name}}-%{{version}}.tar.gz
 %install
 rm -rf %{{buildroot}}
 mkdir -p  %{{buildroot}}
-./bin/spack install {0}
-cp -a `find opt/ -name "*{0}-*"`/* %{{buildroot}}
+# ./bin/spack install {0}
+# cp -a `find opt/ -name "*{0}-*"`/* %{{buildroot}}
+./bin/spack install --install-dir={3} {0}
+cp -a {3}/* %{{buildroot}}
 
 %clean
 rm -rf %{{buildroot}}
@@ -103,7 +105,7 @@ def rpm_install(parser, args):
     
     #import pdb; pdb.set_trace()
     
-    rpmSpecs = generate_specs(topSpec, set(), '/usr/')
+    rpmSpecs = generate_specs(topSpec, set(), '/usr/local/testbar/')
     for rpmName, spec in rpmSpecs:
         with open(os.path.join(args.outputDir, "%s.spec" % rpmName), 'wb') as F:
             F.write(spec)
