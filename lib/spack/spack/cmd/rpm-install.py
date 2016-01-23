@@ -39,7 +39,12 @@ def setup_parser(subparser):
         '--outputDir', dest='outputDir', help="rpmbuild SOURCES directory")
     
 def create_spec(pkgName, rpmName, dependencies, installDir):
-    spec = """Summary: The srpm contains the .spec, a copy of the spack repo, and the artifact
+    spec = """#don't construct debug package
+%define          debug_package %{{nil}}
+#avoid stripping binary (and just do compression)
+%define        __os_install_post /usr/lib/rpm/brp-compress
+
+Summary: The srpm contains the .spec, a copy of the spack repo, and the artifact
 Name: {1}
 Version: 1.0
 Release: 1
