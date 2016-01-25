@@ -64,9 +64,7 @@ SOURCE0 : %{{name}}-%{{version}}.tar.gz
 
 %install
 rm -rf %{{buildroot}}
-# ./bin/spack install {0}
-# cp -a `find /{3}/ -name "*{0}-*"`/* %{{buildroot}}
-./bin/spack install --install-dir={3} {0}
+./bin/spack install --keep-prefix --install-dir={3} {0}
 base=`find {3} -name "*{0}-*" | sed 's/^.//'`
 mkdir -p  %{{buildroot}}/"$base"
 cp -a /"$base"/* %{{buildroot}}/"$base"
@@ -76,7 +74,7 @@ rm -rf %{{buildroot}}
 
 %files
 %defattr(-,root,root,-)
-/*
+{3}/*
 
 %changelog
 * Thu Jan 14 2016  Peter S 1.0-1
@@ -84,7 +82,7 @@ rm -rf %{{buildroot}}
 """.format(
         pkgName, 
         rpmName, 
-        "Requires: %s" % ' '.join(dependencies) if dependencies else "",
+        "BuildRequires: %s" % ' '.join(dependencies) if dependencies else "",
         installDir)
 
     return spec
@@ -97,8 +95,8 @@ def generate_specs(spec, visited, installDir):
     allSpecs = list()
     for child in spec.dependencies.itervalues():
         allSpecs.extend(generate_specs(child, visited, installDir))
-    rpmName = "spack-%s" % spec.name
-    deps = list("spack-%s" % x for x in spec.dependencies)
+    rpmName = "spack_%s" % spec.name
+    deps = list("spack_%s" % x for x in spec.dependencies)
     allSpecs.append((rpmName, create_spec(spec.name, rpmName, deps, installDir)))
     return allSpecs
 

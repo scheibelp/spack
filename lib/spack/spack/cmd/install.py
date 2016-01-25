@@ -73,12 +73,12 @@ class CustomDirectoryLayout(YamlDirectoryLayout):
             spec.version,
             spec.dag_hash(self.hash_len))
 
-        path = join_path(
-            spec.architecture,
-            "%s-%s" % (spec.compiler.name, spec.compiler.version),
-            dir_name)
+        #path = join_path(
+        #    spec.architecture,
+        #    "%s-%s" % (spec.compiler.name, spec.compiler.version),
+        #    dir_name)
 
-        return path
+        return dir_name
 
 
 def install(parser, args):
@@ -96,6 +96,13 @@ def install(parser, args):
         spack.do_checksum = False        # TODO: remove this global.
 
     specs = spack.cmd.parse_specs(args.packages, concretize=True)
+
+    topSpec = iter(specs).next()
+    for spec in topSpec.traverse(order='post'):
+        package = spack.db.get(spec)
+        print package.name, package.installed
+        print package.prefix
+
     for spec in specs:
         package = spack.db.get(spec)
         with spack.installed_db.write_transaction():
