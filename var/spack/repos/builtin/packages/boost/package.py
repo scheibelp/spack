@@ -104,7 +104,8 @@ class Boost(Package):
 
         toolsets = {'g++': 'gcc',
                     'icpc': 'intel',
-                    'clang++': 'clang'}
+                    'clang++': 'clang',
+                    'pgCC': 'pgi'}
 
         for cc, toolset in toolsets.iteritems():
             if cc in self.compiler.cxx_names:
@@ -170,6 +171,23 @@ class Boost(Package):
             '--layout=tagged'])
         
         return threadingOpts
+
+    def patch(self):
+        if self.spec.version < Version("1.56.0"):
+            pgiPath = 'tools/build/v2/tools/pgi.jam'
+        else:
+            pgiPath = 'tools/build/src/tools/pgi.jam'
+
+        mf = FileFilter(pgiPath)
+        
+        # Adjust where pgi.jam looks for the c compiler (normally it expects to
+        # find a binary 'pgcc' in the same directory as the c++ compiler)
+        mf.filter("command_c = $(command_c[1--2]) $(l_command[-1]:B=pgcc) ;",
+            "command_c = $(command_c[1--2]) $(l_command[-1]:B=cc) ;", 
+            string=True)
+        # Fix a bug in the linker options configuration
+        mf.filter('-Bstatic -l$(FINDLIBS-ST)', '-Wl,-Bstatic -l$(FINDLIBS-ST)', string=True)
+        mf.filter('-Bdynamic -l$(FINDLIBS-SA)', '-Wl,-Bdynamic -l$(FINDLIBS-SA)', string=True)
 
     def install(self, spec, prefix):
         withLibs = list()
