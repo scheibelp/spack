@@ -87,7 +87,9 @@ rm -rf %{{buildroot}}
 
     return spec
 
-
+#TODO: need to account for versioning:
+#- need to associate the package version with the rpm version
+#- need to make sure that version bounds on dependencies are added to BuildRequires
 def generate_specs(spec, visited, installDir):
     if spec in visited:
         return list()
