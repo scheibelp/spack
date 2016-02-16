@@ -54,6 +54,9 @@ def setup_parser(subparser):
         '--fake', action='store_true', dest='fake',
         help="Fake install.  Just remove the prefix and touch a fake file in it.")
     subparser.add_argument(
+        '--destdir', dest='destdir',
+        help="Install to a different location than the prefix")
+    subparser.add_argument(
         'packages', nargs=argparse.REMAINDER, help="specs of packages to install")
 
 
@@ -67,6 +70,9 @@ def install(parser, args):
 
     if args.no_checksum:
         spack.do_checksum = False        # TODO: remove this global.
+
+    if args.destdir:
+        spack.destdir = args.destdir
 
     specs = spack.cmd.parse_specs(args.packages, concretize=True)
     for spec in specs:

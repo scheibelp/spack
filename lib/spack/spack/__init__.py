@@ -52,6 +52,8 @@ opt_path       = join_path(prefix, "opt")
 install_path   = join_path(opt_path, "spack")
 etc_path       = join_path(prefix, "etc")
 
+destdir = None
+
 #
 # Set up the default packages database.
 #

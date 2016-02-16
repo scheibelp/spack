@@ -959,7 +959,11 @@ class Package(object):
 
 
     def _sanity_check_install(self):
-        installed = set(os.listdir(self.prefix))
+        if spack.destdir:
+            install_path = os.path.join(spack.destdir, self.prefix[len(os.sep):])
+        else:
+            install_path = self.prefix
+        installed = set(os.listdir(install_path))
         installed.difference_update(spack.install_layout.hidden_file_paths)
         if not installed:
             raise InstallError(

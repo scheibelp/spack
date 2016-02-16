@@ -68,9 +68,10 @@ class MakeExecutable(Executable):
        Note that if the SPACK_NO_PARALLEL_MAKE env var is set it overrides
        everything.
     """
-    def __init__(self, name, jobs):
+    def __init__(self, name, jobs, destdir=None):
         super(MakeExecutable, self).__init__(name)
         self.jobs = jobs
+        self.destdir = destdir
 
     def __call__(self, *args, **kwargs):
         disable = env_flag(SPACK_NO_PARALLEL_MAKE)
@@ -79,6 +80,9 @@ class MakeExecutable(Executable):
         if parallel:
             jobs = "-j%d" % self.jobs
             args = (jobs,) + args
+
+        if self.destdir:
+            args = ("DESTDIR={0}".format(self.destdir),) + args
 
         return super(MakeExecutable, self).__call__(*args, **kwargs)
 
@@ -186,9 +190,9 @@ def set_module_variables_for_package(pkg, m):
     elif pkg.make_jobs:
         jobs = pkg.make_jobs
     m.make_jobs = jobs
-
+    
     # TODO: make these build deps that can be installed if not found.
-    m.make  = MakeExecutable('make', jobs)
+    m.make  = MakeExecutable('make', jobs, spack.destdir)
     m.gmake = MakeExecutable('gmake', jobs)
 
     # easy shortcut to os.environ
