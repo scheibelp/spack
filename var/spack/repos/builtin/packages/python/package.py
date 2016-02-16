@@ -3,6 +3,7 @@ import re
 from contextlib import closing
 from llnl.util.lang import match_predicate
 from spack.util.environment import *
+from collections import defaultdict
 
 from spack import *
 import spack
@@ -127,7 +128,7 @@ class Python(Package):
 
 
     def write_easy_install_pth(self, exts):
-        paths = []
+        extToPaths = {}
         for ext in sorted(exts.values()):
             ext_site_packages = os.path.join(ext.prefix, self.site_packages_dir)
             easy_pth = "%s/easy-install.pth" % ext_site_packages
@@ -136,6 +137,7 @@ class Python(Package):
                 continue
 
             with closing(open(easy_pth)) as f:
+                paths = []
                 for line in f:
                     line = line.rstrip()
 
@@ -146,22 +148,25 @@ class Python(Package):
                         re.search(r'setuptools.*egg$', line)): continue
 
                     paths.append(line)
+                extToPaths[ext] = paths
 
+        for ext, pathList in extToPaths.iteritems():
+            Python.write_pth_file(self.ext_path(ext), pathList)
+
+
+    @staticmethod
+    def write_pth_file(pth_path, paths):
+        with closing(open(pth_path, 'w')) as f:
+            f.write("import sys; sys.__plen = len(sys.path)\n")
+            for path in paths:
+                f.write("%s\n" % path)
+            f.write("import sys; new=sys.path[sys.__plen:]; del sys.path[sys.__plen:]; "
+                    "p=getattr(sys,'__egginsert',0); sys.path[p:p]=new; sys.__egginsert = p+len(new)\n")
+
+    def ext_path(self, ext):
         site_packages = os.path.join(self.prefix, self.site_packages_dir)
-        main_pth = "%s/easy-install.pth" % site_packages
-
-        if not paths:
-            if os.path.isfile(main_pth):
-                os.remove(main_pth)
-
-        else:
-            with closing(open(main_pth, 'w')) as f:
-                f.write("import sys; sys.__plen = len(sys.path)\n")
-                for path in paths:
-                    f.write("%s\n" % path)
-                f.write("import sys; new=sys.path[sys.__plen:]; del sys.path[sys.__plen:]; "
-                        "p=getattr(sys,'__egginsert',0); sys.path[p:p]=new; sys.__egginsert = p+len(new)\n")
-
+        return "{0}/{1}.pth".format(site_packages, ext.name.replace("-", "_"))
+        
 
     def activate(self, ext_pkg, **args):
         ignore=self.python_ignore(ext_pkg, args)
@@ -181,4 +186,6 @@ class Python(Package):
         exts = spack.install_layout.extension_map(self.spec)
         if ext_pkg.name in exts:        # Make deactivate idempotent.
             del exts[ext_pkg.name]
-            self.write_easy_install_pth(exts)
+            pthPath = self.ext_path(ext_pkg)
+            if os.path.isfile(pthPath):
+                os.remove(pthPath)
