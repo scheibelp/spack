@@ -57,12 +57,39 @@ def setup_parser(subparser):
         '--destdir', dest='destdir',
         help="Install to a different location than the prefix")
     subparser.add_argument(
+        '--install-root', dest='install_root',
+        help="Install to the specified directory (and check this directory for prior installs)")
+    subparser.add_argument(
         'packages', nargs=argparse.REMAINDER, help="specs of packages to install")
+
+
+class CustomDirectoryLayout(YamlDirectoryLayout):
+    def __init__(self, root):
+        super(CustomDirectoryLayout, self).__init__(root)
+
+    #TODO: specs will have to start generating different prefixes depending on
+    #whether they are version-agnostic
+    def relative_path_for_spec(self, spec):
+        _check_concrete(spec)
+        dir_name = "%s-%s-%s" % (
+            spec.name,
+            spec.version,
+            spec.dag_hash(self.hash_len))
+
+        #path = join_path(
+        #    spec.architecture,
+        #    "%s-%s" % (spec.compiler.name, spec.compiler.version),
+        #    dir_name)
+
+        return dir_name
 
 
 def install(parser, args):
     if not args.packages:
         tty.die("install requires at least one package argument")
+
+    if args.install_root:
+        spack.install_layout = CustomDirectoryLayout(args.install_root)
 
     if args.jobs is not None:
         if args.jobs <= 0:
