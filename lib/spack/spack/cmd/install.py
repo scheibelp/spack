@@ -23,11 +23,14 @@
 # Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ##############################################################################
 import argparse
+import os
 
 import llnl.util.tty as tty
 
 import spack
 import spack.cmd
+from spack import join_path, mkdirp
+from spack.directory_layout import YamlDirectoryLayout, _check_concrete
 
 description = "Build and install packages"
 
@@ -64,8 +67,9 @@ def setup_parser(subparser):
 
 
 class CustomDirectoryLayout(YamlDirectoryLayout):
-    def __init__(self, root):
+    def __init__(self, root, destDir=None):
         super(CustomDirectoryLayout, self).__init__(root)
+        self.destDir = destDir
 
     #TODO: specs will have to start generating different prefixes depending on
     #whether they are version-agnostic
@@ -83,13 +87,51 @@ class CustomDirectoryLayout(YamlDirectoryLayout):
 
         return dir_name
 
+    def _redirect(self, path):
+        """
+        For operations in directory_layout that do writes.
+        """
+        if self.destDir:
+            if path.startswith(os.sep):
+                path = path[len(os.sep):]
+            return join_path(self.destDir, path)
+        else:
+            return path
+
+    def build_log_path(self, spec):
+        return self._redirect(super(CustomDirectoryLayout, self).build_log_path(spec))
+
+    def create_install_directory(self, spec):
+        _check_concrete(spec)
+
+        path = self._redirect(self.path_for_spec(spec))
+        spec_file_path = self._redirect(self.spec_file_path(spec))
+
+        if os.path.isdir(path):
+            if not os.path.isfile(spec_file_path):
+                raise InconsistentInstallDirectoryError(
+                    'No spec file found at path %s' % spec_file_path)
+
+            installed_spec = self.read_spec(spec_file_path)
+            if installed_spec == self.spec:
+                raise InstallDirectoryAlreadyExistsError(path)
+
+            if spec.dag_hash() == installed_spec.dag_hash():
+                raise SpecHashCollisionError(installed_hash, spec_hash)
+            else:
+                raise InconsistentInstallDirectoryError(
+                    'Spec file in %s does not match hash!' % spec_file_path)
+
+        print self._redirect(self.metadata_path(spec))
+        mkdirp(self._redirect(self.metadata_path(spec)))
+        self.write_spec(spec, spec_file_path)
 
 def install(parser, args):
     if not args.packages:
         tty.die("install requires at least one package argument")
 
     if args.install_root:
-        spack.install_layout = CustomDirectoryLayout(args.install_root)
+        spack.install_layout = CustomDirectoryLayout(args.install_root, args.destdir)
 
     if args.jobs is not None:
         if args.jobs <= 0:

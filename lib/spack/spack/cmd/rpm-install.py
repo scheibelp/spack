@@ -64,7 +64,7 @@ SOURCE0 : %{{name}}-%{{version}}.tar.gz
 
 %install
 rm -rf %{{buildroot}}
-./bin/spack install --destdir=. --install-root={3} {0}
+./bin/spack install --destdir=. --install-root=%{{buildroot}} {0}
 
 %clean
 rm -rf %{{buildroot}}
