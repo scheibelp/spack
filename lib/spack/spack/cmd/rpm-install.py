@@ -64,7 +64,7 @@ SOURCE0 : %{{name}}-%{{version}}.tar.gz
 
 %install
 rm -rf %{{buildroot}}
-./bin/spack install --destdir=. --install-root=%{{buildroot}} {0}
+./bin/spack install --destdir=%{{buildroot}} --install-root={3} {0}
 
 %clean
 rm -rf %{{buildroot}}
@@ -110,7 +110,7 @@ def rpm_install(parser, args):
     
     #import pdb; pdb.set_trace()
     
-    rpmSpecs = generate_specs(topSpec, set(), '/usr/local/testbar/')
+    rpmSpecs = generate_specs(topSpec, set(), '/opt/local/spack/')
     for rpmName, spec in rpmSpecs:
         with open(os.path.join(args.outputDir, "%s.spec" % rpmName), 'wb') as F:
             F.write(spec)
