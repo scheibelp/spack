@@ -65,13 +65,14 @@ SOURCE0 : %{{name}}-%{{version}}.tar.gz
 %install
 rm -rf %{{buildroot}}
 ./bin/spack install --destdir=%{{buildroot}} --install-root={3} {0}
+find %{{buildroot}}/{3} -name "build.out" | xargs rm
 
 %clean
 rm -rf %{{buildroot}}
 
 %files
 %defattr(-,root,root,-)
-{3}/*
+/*
 
 %changelog
 * Thu Jan 14 2016  Peter S 1.0-1
