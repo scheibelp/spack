@@ -912,6 +912,9 @@ class Package(object):
                     with log_output(log_file, verbose, sys.stdout.isatty(), True):
                         self.install(self.spec, self.prefix)
 
+                if self.is_extension:
+                    self.extendee_spec.package.dependency_post_install(self)
+
                 # Ensure that something was actually installed.
                 self._sanity_check_install()
 
@@ -1011,6 +1014,13 @@ class Package(object):
 
         3. A lot of Qt extensions need QTDIR set.  This can be used to do that.
 
+        """
+        pass
+
+
+    def dependency_post_install(spec, dependent_spec):
+        """
+        E.g. python package can create a modified .pth file
         """
         pass
 
