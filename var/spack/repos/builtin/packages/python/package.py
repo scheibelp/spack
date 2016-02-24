@@ -84,9 +84,9 @@ class Python(Package):
         """
         # Python extension builds can have a global python executable function
         if self.version >= Version("3.0.0") and self.version < Version("4.0.0"):
-            module.python = Executable(join_path(spec.prefix.bin, 'python3'))
+            module.python = PythonExe(join_path(spec.prefix.bin, 'python3'), spack.destdir)
         else:
-            module.python = Executable(join_path(spec.prefix.bin, 'python'))
+            module.python = PythonExe(join_path(spec.prefix.bin, 'python'), spack.destdir)
 
         # Add variables for lib/pythonX.Y and lib/pythonX.Y/site-packages dirs.
         module.python_lib_dir     = os.path.join(ext_spec.prefix, self.python_lib_dir)
@@ -182,3 +182,15 @@ class Python(Package):
         if ext_pkg.name in exts:        # Make deactivate idempotent.
             del exts[ext_pkg.name]
             self.write_easy_install_pth(exts)
+
+
+class PythonExe(Executable):
+    def __init__(self, name, destdir=None):
+        super(PythonExe, self).__init__(name)
+        self.destdir = destdir
+    
+    def __call__(self, *args, **kwargs):
+        if "setup.py" in args and self.destdir:
+            args = args[:2] + ("--root={0}".format(self.destdir),) + args[2:]
+        
+        return super(PythonExe, self).__call__(*args, **kwargs)
