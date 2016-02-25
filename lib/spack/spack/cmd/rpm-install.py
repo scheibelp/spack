@@ -38,7 +38,7 @@ def setup_parser(subparser):
     subparser.add_argument(
         '--outputDir', dest='outputDir', help="rpmbuild SOURCES directory")
     
-def create_spec(pkgName, rpmName, dependencies, installDir):
+def create_spec(pkgSpec, rpmName, dependencies, installDir):
     spec = """#don't construct debug package
 %define          debug_package %{{nil}}
 #avoid stripping binary (and just do compression)
@@ -64,7 +64,7 @@ SOURCE0 : %{{name}}-%{{version}}.tar.gz
 
 %install
 rm -rf %{{buildroot}}
-./bin/spack install --destdir=%{{buildroot}} --install-root={3} {0}
+./bin/spack install --ignore-dependencies --destdir=%{{buildroot}} --install-root={3} {0}
 find %{{buildroot}}/{3} -name "build.out" | xargs rm
 
 %clean
@@ -78,7 +78,7 @@ rm -rf %{{buildroot}}
 * Thu Jan 14 2016  Peter S 1.0-1
 - First Build
 """.format(
-        pkgName, 
+        pkgSpec, 
         rpmName, 
         "BuildRequires: %s" % ' '.join(dependencies) if dependencies else "",
         installDir)
@@ -99,7 +99,7 @@ def generate_specs(spec, visited, installDir):
     deps = list("spack_%s" % x for x in spec.dependencies)
     #TODO: instead of spec.name need to actually pass in the whole concrete
     #spec for this package (including version and variants)
-    allSpecs.append((rpmName, create_spec(spec.name, rpmName, deps, installDir)))
+    allSpecs.append((rpmName, create_spec(str(spec), rpmName, deps, installDir)))
     return allSpecs
 
 
