@@ -124,10 +124,7 @@ class DirectoryLayout(object):
     def path_for_spec(self, spec):
         """Return an absolute path from the root to a directory for the spec."""
         _check_concrete(spec)
-
-        path = self.relative_path_for_spec(spec)
-        assert(not path.startswith(self.root))
-        return os.path.join(self.root, path)
+        return spec.prefix
 
 
     def remove_install_directory(self, spec):
