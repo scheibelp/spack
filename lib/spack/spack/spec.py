@@ -98,7 +98,6 @@ from StringIO import StringIO
 from operator import attrgetter
 import yaml
 from yaml.error import MarkedYAMLError
-import os
 
 import llnl.util.tty as tty
 from llnl.util.lang import *
@@ -414,7 +413,6 @@ class Spec(object):
         self.variants = other.variants
         self.variants.spec = self
         self.namespace = other.namespace
-        self.install_root = None
 
         # Specs are by default not assumed to be normal, but in some
         # cases we've read them from a file want to assume normal.
@@ -647,24 +645,8 @@ class Spec(object):
 
 
     @property
-    def prefix(self):   
-        root = self.install_root if self.install_root else spack.install_layout.root
-
-        #what if the name is too long?
-        #one could build a directory structure with the name components
-        dir_name = "%s-%s-%s" % (
-            self.name,
-            self.version,
-            self.dag_hash(spack.install_layout.hash_len))
-
-        #TODO: perhaps the directory_layout should intervene once I know what
-        #components I want in the path (i.e. it handles joining them together)
-        #path = join_path(
-        #    self.architecture,
-        #    "%s-%s" % (self.compiler.name, self.compiler.version),
-        #    dir_name)
-        
-        return Prefix(os.path.join(root, dir_name))
+    def prefix(self):
+        return Prefix(spack.install_layout.path_for_spec(self))
 
 
     def dag_hash(self, length=None):
@@ -1432,7 +1414,6 @@ class Spec(object):
         self.variants = other.variants.copy()
         self.variants.spec = self
         self.namespace = other.namespace
-        self.install_root = None
 
         # If we copy dependencies, preserve DAG structure in the new spec
         if kwargs.get('deps', True):

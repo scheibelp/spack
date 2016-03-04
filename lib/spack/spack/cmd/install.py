@@ -140,13 +140,12 @@ def install(parser, args):
     if args.no_checksum:
         spack.do_checksum = False        # TODO: remove this global.
 
+    if args.destdir:
+        spack.destdir = args.destdir
+
     specs = spack.cmd.parse_specs(args.packages, concretize=True)
-    for spec in specs:   
+    for spec in specs:
         package = spack.repo.get(spec)
-        if args.destdir:
-            #TODO: need to make sure that all dependencies are already installed
-            spec.install_root = join_path(args.destdir, spack.install_layout.root)
-            spack.destdir = args.destdir
         with spack.installed_db.write_transaction():
             package.do_install(
                 keep_prefix=args.keep_prefix,
