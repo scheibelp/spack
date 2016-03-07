@@ -113,7 +113,7 @@ class CustomDirectoryLayout(YamlDirectoryLayout):
                     'No spec file found at path %s' % spec_file_path)
 
             installed_spec = self.read_spec(spec_file_path)
-            if installed_spec == self.spec:
+            if installed_spec == spec:
                 raise InstallDirectoryAlreadyExistsError(path)
 
             if spec.dag_hash() == installed_spec.dag_hash():
