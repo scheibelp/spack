@@ -1,6 +1,8 @@
 from spack import *
 import spack
 
+import os
+
 class Boost(Package):
     """Boost provides free peer-reviewed portable C++ source
        libraries, emphasizing libraries that work well with the C++
@@ -190,7 +192,13 @@ class Boost(Package):
 
         bootstrap = Executable('./bootstrap.sh')
 
-        bootstrap_options = ['--prefix=%s' % prefix]
+        if spack.destdir:
+            # TODO: is it actually important to wait until b2 invocation when 
+            # destdir is used?
+            bootstrap_options = []
+        else:
+            bootstrap_options = ['--prefix=%s' % prefix]
+        
         self.determine_bootstrap_options(spec, withLibs, bootstrap_options)
 
         bootstrap(*bootstrap_options)
@@ -203,6 +211,14 @@ class Boost(Package):
 
         threadingOpts = self.determine_b2_options(spec, b2_options)
 
+        if spack.destdir:
+            if prefix.startswith(os.sep):
+                redirPrefix = prefix[len(os.sep):]
+            else:
+                redirPrefix = prefix
+            
+            b2_options.extend(['--prefix=%s' % join_path(spack.destdir, redirPrefix)])
+        
         # In theory it could be done on one call but it fails on
         # Boost.MPI if the threading options are not separated.
         for threadingOpt in threadingOpts:
