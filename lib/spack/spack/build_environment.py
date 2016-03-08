@@ -177,6 +177,15 @@ def set_build_environment_variables(pkg):
     path_set("PKG_CONFIG_PATH", pkg_config_dirs)
 
 
+def redirect_path(path):
+    if spack.destdir:
+        if path.startswith(os.sep):
+            path = path[len(os.sep):]
+        return join_path(spack.destdir, path)
+    else:
+        return path
+
+
 def set_module_variables_for_package(pkg, m):
     """Populate the module scope of install() with some useful functions.
        This makes things easier for package writers.
@@ -193,7 +202,10 @@ def set_module_variables_for_package(pkg, m):
     
     # TODO: make these build deps that can be installed if not found.
     m.make  = MakeExecutable('make', jobs, spack.destdir)
-    m.gmake = MakeExecutable('gmake', jobs)
+    m.gmake = MakeExecutable('gmake', jobs, spack.destdir)
+    m.make_redir = MakeExecutable('make-redir', jobs, spack.destdir)
+
+    m.redirect_path = redirect_path
 
     # easy shortcut to os.environ
     m.env = os.environ

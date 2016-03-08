@@ -1,4 +1,5 @@
 from spack import *
+import spack
 
 class Bzip2(Package):
     """bzip2 is a freely available, patent free high-quality data
@@ -34,12 +35,31 @@ class Bzip2(Package):
                       'ln -s libbz2.{0}.dylib libbz2.{1}.dylib'.format(v3, v2), string=True)
 
 
+    def setup_makefile_for_redirect(self):
+        mf = FileFilter('Makefile')
+        # e.g. replace "if ( test ! -d $(PREFIX)/bin ) ; then mkdir -p $(PREFIX)/bin ; fi"
+        # with "mkdir -p $(PREFIX)/bin"
+        # remove calls to "test" since make-redir does not redirect it
+        mf.filter(r'if \( test ! -d \$\(PREFIX\)/[^;]+ \) ; then (mkdir -p \$\(PREFIX\)/[^;]+) ; fi', 
+            r'\1')
+
+        # e.g. replace 'echo ".so man1/bzgrep.1" > $(PREFIX)/man/man1/bzegrep.1'
+        # with 'echo ".so man1/bzgrep.1" > DESTDIR$(PREFIX)/man/man1/bzegrep.1'
+        # (make-redir does not redirect 'echo')
+        mf.filter(r'echo ".so man1/([^"]+)" > \$\(PREFIX\)/man/man1/(\S+)', 
+            r'echo ".so man1/\1" > {0}/$(PREFIX)/man/man1/\2'.format(spack.destdir))
+
     def install(self, spec, prefix):
         make('-f', 'Makefile-libbz2_so')
         make('clean')
-        make("install", "PREFIX=%s" % prefix)
+        if spack.destdir:
+            self.setup_makefile_for_redirect()
+            make_redir("install", "PREFIX=%s" % prefix)
+        else:
+            make("install", "PREFIX=%s" % prefix)
 
-        install('bzip2-shared', join_path(prefix.bin, 'bzip2'))
+        bzip2Path = join_path(prefix.bin, 'bzip2')
+        install('bzip2-shared', redirect_path(bzip2Path))
 
         v1, v2, v3 = (self.spec.version.up_to(i) for i in (1,2,3))
         if 'darwin' in self.spec.architecture:
@@ -49,12 +69,13 @@ class Bzip2(Package):
             lib = 'libbz2.so'
             lib1, lib2, lib3 = ('libbz2.so.{0}'.format(v) for v in (v1, v2, v3))
 
-        install(lib3, join_path(prefix.lib, lib3))
-        with working_dir(prefix.lib):
+        lib3Path = join_path(prefix.lib, lib3)
+        install(lib3, redirect_path(lib3Path))
+        with working_dir(redirect_path(prefix.lib)):
             for l in (lib, lib1, lib2):
-                symlink(lib3, l)
-
-        with working_dir(prefix.bin):
+                symlink(lib3Path, l)
+        
+        with working_dir(redirect_path(prefix.bin)):
             force_remove('bunzip2', 'bzcat')
-            symlink('bzip2', 'bunzip2')
-            symlink('bzip2', 'bzcat')
+            symlink(bzip2Path, 'bunzip2')
+            symlink(bzip2Path, 'bzcat')
