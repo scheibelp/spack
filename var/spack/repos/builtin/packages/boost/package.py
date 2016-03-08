@@ -193,9 +193,11 @@ class Boost(Package):
         bootstrap = Executable('./bootstrap.sh')
 
         if spack.destdir:
-            # TODO: is it actually important to wait until b2 invocation when 
-            # destdir is used?
-            bootstrap_options = []
+            if prefix.startswith(os.sep):
+                redirPrefix = prefix[len(os.sep):]
+            else:
+                redirPrefix = prefix
+            bootstrap_options = ['--prefix=%s' % join_path(spack.destdir, redirPrefix)]
         else:
             bootstrap_options = ['--prefix=%s' % prefix]
         
@@ -210,14 +212,6 @@ class Boost(Package):
         b2_options = ['-j', '%s' % make_jobs]
 
         threadingOpts = self.determine_b2_options(spec, b2_options)
-
-        if spack.destdir:
-            if prefix.startswith(os.sep):
-                redirPrefix = prefix[len(os.sep):]
-            else:
-                redirPrefix = prefix
-            
-            b2_options.extend(['--prefix=%s' % join_path(spack.destdir, redirPrefix)])
         
         # In theory it could be done on one call but it fails on
         # Boost.MPI if the threading options are not separated.
