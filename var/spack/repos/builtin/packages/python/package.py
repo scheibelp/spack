@@ -6,7 +6,7 @@ from spack.util.environment import *
 
 from spack import *
 import spack
-
+from spack.build_environment import redirect_path
 
 class Python(Package):
     """The Python programming language."""
@@ -94,7 +94,7 @@ class Python(Package):
         module.site_packages_dir  = os.path.join(ext_spec.prefix, self.site_packages_dir)
 
         # Make the site packages directory if it does not exist already.
-        mkdirp(module.site_packages_dir)
+        mkdirp(redirect_path(module.site_packages_dir))
 
         # Set PYTHONPATH to include site-packages dir for the
         # extension and any other python extensions it depends on.
