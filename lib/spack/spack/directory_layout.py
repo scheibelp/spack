@@ -36,6 +36,7 @@ from llnl.util.filesystem import join_path, mkdirp
 
 from spack.spec import Spec
 from spack.error import SpackError
+from spack.build_environment import redirect_path
 
 
 def _check_concrete(spec):
@@ -227,15 +228,15 @@ class YamlDirectoryLayout(DirectoryLayout):
 
 
     def build_log_path(self, spec):
-        return join_path(self.path_for_spec(spec), self.metadata_dir,
-                         self.build_log_name)
+        return redirect_path(join_path(
+            self.path_for_spec(spec), self.metadata_dir, self.build_log_name))
 
 
     def create_install_directory(self, spec):
         _check_concrete(spec)
 
-        path = self.path_for_spec(spec)
-        spec_file_path = self.spec_file_path(spec)
+        path = redirect_path(self.path_for_spec(spec))
+        spec_file_path = redirect_path(self.spec_file_path(spec))
 
         if os.path.isdir(path):
             if not os.path.isfile(spec_file_path):
@@ -252,7 +253,7 @@ class YamlDirectoryLayout(DirectoryLayout):
                 raise InconsistentInstallDirectoryError(
                     'Spec file in %s does not match hash!' % spec_file_path)
 
-        mkdirp(self.metadata_path(spec))
+        mkdirp(redirect_path(self.metadata_path(spec)))
         self.write_spec(spec, spec_file_path)
 
 
