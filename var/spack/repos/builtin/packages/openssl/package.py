@@ -32,7 +32,8 @@ class Openssl(Package):
                "--openssldir=%s" % join_path(prefix, 'etc', 'openssl'),
                "zlib",
                "no-krb5",
-               "shared")
+               "shared",
+               "--install_prefix=%s" % redirect_path(prefix))
         # Remove non-standard compiler options if present. These options are
         # present e.g. on Darwin. They are non-standard, i.e. most compilers
         # (e.g. gcc) will not accept them.
