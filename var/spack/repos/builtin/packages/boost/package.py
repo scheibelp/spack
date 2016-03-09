@@ -1,7 +1,6 @@
 from spack import *
 import spack
-
-import os
+from spack.build_environment import redirect_path
 
 class Boost(Package):
     """Boost provides free peer-reviewed portable C++ source
@@ -192,14 +191,7 @@ class Boost(Package):
 
         bootstrap = Executable('./bootstrap.sh')
 
-        if spack.destdir:
-            if prefix.startswith(os.sep):
-                redirPrefix = prefix[len(os.sep):]
-            else:
-                redirPrefix = prefix
-            bootstrap_options = ['--prefix=%s' % join_path(spack.destdir, redirPrefix)]
-        else:
-            bootstrap_options = ['--prefix=%s' % prefix]
+        bootstrap_options = ['--prefix=%s' % redirect_path(prefix)]
         
         self.determine_bootstrap_options(spec, withLibs, bootstrap_options)
 
@@ -212,7 +204,7 @@ class Boost(Package):
         b2_options = ['-j', '%s' % make_jobs]
 
         threadingOpts = self.determine_b2_options(spec, b2_options)
-        
+
         # In theory it could be done on one call but it fails on
         # Boost.MPI if the threading options are not separated.
         for threadingOpt in threadingOpts:

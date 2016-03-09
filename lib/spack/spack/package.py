@@ -66,6 +66,7 @@ from spack.version import *
 from spack.stage import Stage
 from spack.util.compression import allowed_archive, extension
 from spack.util.executable import ProcessError
+from spack.build_environment import redirect_path
 
 """Allowed URL schemes for spack packages."""
 _ALLOWED_URL_SCHEMES = ["http", "https", "ftp", "file", "git"]
@@ -959,11 +960,7 @@ class Package(object):
 
 
     def _sanity_check_install(self):
-        if spack.destdir:
-            install_path = os.path.join(spack.destdir, self.prefix[len(os.sep):])
-        else:
-            install_path = self.prefix
-        installed = set(os.listdir(install_path))
+        installed = set(os.listdir(redirect_path(self.prefix)))
         installed.difference_update(spack.install_layout.hidden_file_paths)
         if not installed:
             raise InstallError(
