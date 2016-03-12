@@ -70,7 +70,6 @@ from spack.util.executable import ProcessError
 from spack.build_environment import redirect_path
 from spack.util.environment import dump_environment
 
-
 """Allowed URL schemes for spack packages."""
 _ALLOWED_URL_SCHEMES = ["http", "https", "ftp", "file", "git"]
 
