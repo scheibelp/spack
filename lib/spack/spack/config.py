@@ -129,6 +129,7 @@ from ordereddict_backport import OrderedDict
 
 import llnl.util.tty as tty
 from llnl.util.filesystem import mkdirp
+import copy
 
 import spack
 from spack.error import SpackError
@@ -194,6 +195,49 @@ section_schemas = {
                 'default': [],
                 'items': {
                     'type': 'string'},},},},
+    'packages': {
+        '$schema': 'http://json-schema.org/schema#',
+        'title': 'Spack package configuration file schema',
+        'type': 'object',
+        'additionalProperties': False,
+        'patternProperties': {
+            r'packages:?': {
+                'type': 'object',
+                'default': {},
+                'additionalProperties': False,
+                'patternProperties': {
+                    r'\w[\w-]*': { # package name
+                        'type': 'object',
+                        'default': {},
+                        'additionalProperties': False,
+                        'properties': {
+                            'version': {
+                                'type' : 'array',
+                                'default' : [],
+                                'items' : { 'anyOf' : [ { 'type' : 'string' },
+                                                        { 'type' : 'number'}]}}, #version strings
+                            'compiler': {
+                                'type' : 'array',
+                                'default' : [],
+                                'items' : { 'type' : 'string' } }, #compiler specs
+                            'buildable': {
+                                'type':  'boolean',
+                                'default': True,
+                             },
+                            'providers': {
+                                'type':  'object',
+                                'default': {},
+                                'additionalProperties': False,
+                                'patternProperties': {
+                                    r'\w[\w-]*': {
+                                        'type' : 'array',
+                                        'default' : [],
+                                        'items' : { 'type' : 'string' },},},},
+                            'paths': {
+                                'type' : 'object',
+                                'default' : {},
+                            }
+                        },},},},},}
 }
 
 """OrderedDict of config scopes keyed by name.
@@ -205,7 +249,7 @@ config_scopes = OrderedDict()
 def validate_section_name(section):
     """Raise a ValueError if the section is not a valid section."""
     if section not in section_schemas:
-        raise ValueError("Invalid config section: '%s'.  Options are %s."
+        raise ValueError("Invalid config section: '%s'.  Options are %s"
                          % (section, section_schemas))
 
 
@@ -335,7 +379,7 @@ def validate_scope(scope):
         return config_scopes[scope]
 
     else:
-        raise ValueError("Invalid config scope: '%s'.  Must be one of %s."
+        raise ValueError("Invalid config scope: '%s'.  Must be one of %s"
                          % (scope, config_scopes.keys()))
 
 
@@ -350,7 +394,7 @@ def _read_config_file(filename, schema):
             "Invlaid configuration. %s exists but is not a file." % filename)
 
     elif not os.access(filename, os.R_OK):
-        raise ConfigFileError("Config file is not readable: %s." % filename)
+        raise ConfigFileError("Config file is not readable: %s" % filename)
 
     try:
         tty.debug("Reading config file %s" % filename)
@@ -494,6 +538,36 @@ def print_section(section):
         raise ConfigError("Error reading configuration: %s" % section)
 
 
+def spec_externals(spec):
+    """Return a list of spec, directory pairs for each external location for spec"""
+    allpkgs = get_config('packages')
+    name = spec.name
+    spec_locations = []
+
+    pkg_paths = allpkgs.get(name, {}).get('paths', None)
+    if not pkg_paths:
+        return []
+
+    for pkg,path in pkg_paths.iteritems():
+        if not spec.satisfies(pkg):
+            continue
+        if not path:
+            continue
+        spec_locations.append( (spack.spec.Spec(pkg), path) )
+    return spec_locations
+
+
+def is_spec_buildable(spec):
+    """Return true if the spec pkgspec is configured as buildable"""
+    allpkgs = get_config('packages')
+    name = spec.name
+    if not spec.name in allpkgs:
+        return True
+    if not 'buildable' in allpkgs[spec.name]:
+        return True
+    return allpkgs[spec.name]['buildable']
+
+
 class ConfigError(SpackError): pass
 class ConfigFileError(ConfigError): pass
 
@@ -509,7 +583,7 @@ class ConfigFormatError(ConfigError):
         # Try to get line number from erroneous instance and its parent
         instance_mark = getattr(validation_error.instance, '_start_mark', None)
         parent_mark = getattr(validation_error.parent, '_start_mark', None)
-        path = getattr(validation_error, 'path', None)
+        path = [str(s) for s in getattr(validation_error, 'path', None)]
 
         # Try really hard to get the parent (which sometimes is not
         # set) This digs it out of the validated structure if it's not
