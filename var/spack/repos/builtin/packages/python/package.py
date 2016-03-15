@@ -3,7 +3,6 @@ import re
 from contextlib import closing
 from llnl.util.lang import match_predicate
 from spack.util.environment import *
-from collections import defaultdict
 
 from spack import *
 import spack
