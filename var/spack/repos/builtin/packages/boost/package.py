@@ -82,7 +82,6 @@ class Boost(Package):
     variant('debug', default=False, description='Switch to the debug version of Boost')
     variant('shared', default=True, description="Additionally build shared libraries")
     variant('multithreaded', default=True, description="Build multi-threaded versions of libraries")
-    variant('singlethreaded', default=True, description="Build single-threaded versions of libraries")
     variant('icu_support', default=False, description="Include ICU support (for regex/locale libraries)")
 
     depends_on('icu', when='+icu_support')
@@ -160,20 +159,15 @@ class Boost(Package):
         if '+shared' in spec:
             linkTypes.append('shared')
 
-        threadingOpts = []
         if '+multithreaded' in spec:
-            threadingOpts.append('multi')
-        if '+singlethreaded' in spec:
-            threadingOpts.append('single')
-        if not threadingOpts:
-            raise RuntimeError("At least one of {singlethreaded, multithreaded} must be enabled")
+            options.append('threading=multi')
+        else:
+            options.append('threading=single')
 
         options.extend([
             'toolset=%s' % self.determine_toolset(spec),
             'link=%s' % ','.join(linkTypes),
-            '--layout=tagged'])
-
-        return threadingOpts
+            '--layout=system'])
 
     def install(self, spec, prefix):
         # On Darwin, Boost expects the Darwin libtool. However, one of the
@@ -215,12 +209,8 @@ class Boost(Package):
         b2 = Executable(b2name)
         b2_options = ['-j', '%s' % make_jobs]
 
-        threadingOpts = self.determine_b2_options(spec, b2_options)
-
-        # In theory it could be done on one call but it fails on
-        # Boost.MPI if the threading options are not separated.
-        for threadingOpt in threadingOpts:
-            b2('install', 'threading=%s' % threadingOpt, *b2_options)
+        self.determine_b2_options(spec, b2_options)
+        b2('install', *b2_options)
 
         # The shared libraries are not installed correctly on Darwin; correct this
         if (sys.platform == 'darwin') and ('+shared' in spec):
