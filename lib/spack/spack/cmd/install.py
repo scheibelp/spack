@@ -55,6 +55,12 @@ def setup_parser(subparser):
         '--fake', action='store_true', dest='fake',
         help="Fake install. Just remove prefix and create a fake file.")
     subparser.add_argument(
+        '--destdir', dest='destdir',
+        help="Install to a different location than the prefix")
+    subparser.add_argument(
+        '--install-path', dest='install_path',
+        help="Specify the complete path (everything up to {lib/, bin/, etc.})")
+    subparser.add_argument(
         '--dirty', action='store_true', dest='dirty',
         help="Install a package *without* cleaning the environment.")
     subparser.add_argument(
@@ -77,6 +83,18 @@ def install(parser, args):
         spack.do_checksum = False        # TODO: remove this global.
 
     specs = spack.cmd.parse_specs(args.packages, concretize=True)
+
+    if args.destdir:
+        assert(len(specs) == 1)
+        spack.install_layout.destdir = args.destdir
+        spec = iter(specs).next()
+        spack.install_layout.redirected.add(spec.name)
+
+    if args.install_path:
+        assert(len(specs) == 1)
+        spec = iter(specs).next()
+        spack.install_layout.pkgToPath[spec.name] = args.install_path
+
     for spec in specs:
         package = spack.repo.get(spec)
         with spack.installed_db.write_transaction():
