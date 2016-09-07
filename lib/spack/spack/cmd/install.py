@@ -58,6 +58,9 @@ def setup_parser(subparser):
         '--destdir', dest='destdir',
         help="Install to a different location than the prefix")
     subparser.add_argument(
+        '--install-extension', action='store_true', dest='install_extension',
+        help="For extension packages: automatically activate the extension")
+    subparser.add_argument(
         '--install-path', dest='install_path',
         help="Specify the complete path (everything up to {lib/, bin/, etc.})")
     subparser.add_argument(
@@ -108,3 +111,7 @@ def install(parser, args):
                 fake=args.fake,
                 dirty=args.dirty,
                 explicit=True)
+        
+            if args.install_extension and package.is_extension:
+                package.extendee_spec.package.activate(package, **package.extendee_args)
+

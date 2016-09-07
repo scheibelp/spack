@@ -62,10 +62,11 @@ class LinkTree(object):
                 return dest
         return None
 
-    def merge(self, dest_root, **kwargs):
+    def merge(self, dest_root, dstCtxt, **kwargs):
         """Link all files in src into dest, creating directories
            if necessary."""
         kwargs['order'] = 'pre'
+        dest_root = dstCtxt.redirect_path(dest_root)
         for src, dest in traverse_tree(self._root, dest_root, **kwargs):
             if os.path.isdir(src):
                 if not os.path.exists(dest):
@@ -82,7 +83,7 @@ class LinkTree(object):
 
             else:
                 assert(not os.path.exists(dest))
-                os.symlink(src, dest)
+                dstCtxt.symlink_redirect(src, dest)
 
     def unmerge(self, dest_root, **kwargs):
         """Unlink all files in dest that exist in src.

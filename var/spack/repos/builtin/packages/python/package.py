@@ -32,7 +32,6 @@ from llnl.util.lang import match_predicate
 from spack import *
 from spack.util.environment import *
 
-
 class Python(Package):
     """The Python programming language."""
 
@@ -243,8 +242,16 @@ class Python(Package):
 
         # Make the site packages directory for extensions
         if ext_spec.package.is_extension:
-            ext_spec.package.installCtxt.mkdirp_redirect(
-                module.site_packages_dir)
+            ext_spec.package.installCtxt.mkdirp_redirect(module.site_packages_dir)
+
+
+    def dependency_post_install(self, ext_pkg):
+        """
+        Create a per-package .pth file (which is not ignored during activation,
+        unlike easy-install.pth)
+        """
+        self.write_easy_install_pth(ext_pkg)
+
 
     # ========================================================================
     # Handle specifics of activating and deactivating python modules.
@@ -274,46 +281,41 @@ class Python(Package):
 
         return match_predicate(ignore_arg, patterns)
 
-    def write_easy_install_pth(self, exts):
+    def write_easy_install_pth(self, ext):
+        ext_site_packages = os.path.join(ext.prefix, self.site_packages_dir)
+        easy_pth = ext.installCtxt.redirect_path(
+            "%s/easy-install.pth" % ext_site_packages)
+        if not os.path.isfile(easy_pth):
+            return
+    
         paths = []
-        for ext in sorted(exts.values()):
-            ext_site_packages = join_path(ext.prefix, self.site_packages_dir)
-            easy_pth = join_path(ext_site_packages, "easy-install.pth")
+        with closing(open(easy_pth)) as f:
+            for line in f:
+                line = line.rstrip()
 
-            if not os.path.isfile(easy_pth):
-                continue
+                # Skip lines matching these criteria
+                if not line:
+                    continue
+                if re.search(r'^(import|#)', line):
+                    continue
+                if ((ext.name != 'py-setuptools' and
+                     re.search(r'setuptools.*egg$', line))):
+                    continue
 
-            with closing(open(easy_pth)) as f:
-                for line in f:
-                    line = line.rstrip()
+                paths.append(line)
 
-                    # Skip lines matching these criteria
-                    if not line:
-                        continue
-                    if re.search(r'^(import|#)', line):
-                        continue
-                    if ((ext.name != 'py-setuptools' and
-                         re.search(r'setuptools.*egg$', line))):
-                        continue
+        Python.write_pth_file(self.ext_path(ext), paths)
 
-                    paths.append(line)
-
-        site_packages = join_path(self.prefix, self.site_packages_dir)
-        main_pth = join_path(site_packages, "easy-install.pth")
-
-        if not paths:
-            if os.path.isfile(main_pth):
-                os.remove(main_pth)
-
-        else:
-            with closing(open(main_pth, 'w')) as f:
-                f.write("""
+    @staticmethod
+    def write_pth_file(pth_path, paths):
+        with closing(open(pth_path, 'w')) as f:
+            f.write("""
 import sys
 sys.__plen = len(sys.path)
 """)
-                for path in paths:
-                    f.write("{0}\n".format(path))
-                f.write("""
+            for path in paths:
+                f.write("{0}\n".format(path))
+            f.write("""
 new = sys.path[sys.__plen:]
 del sys.path[sys.__plen:]
 p = getattr(sys, '__egginsert', 0)
@@ -321,25 +323,20 @@ sys.path[p:p] = new
 sys.__egginsert = p + len(new)
 """)
 
+    def ext_path(self, ext):
+        site_packages = os.path.join(ext.prefix, self.site_packages_dir)
+        pth_name = ext.name.replace("-", "_") + ".pth"
+        return ext.installCtxt.redirect_path(join_path(site_packages, pth_name))
+
     def activate(self, ext_pkg, **args):
         ignore = self.python_ignore(ext_pkg, args)
         args.update(ignore=ignore)
 
         super(Python, self).activate(ext_pkg, **args)
 
-        exts = spack.install_layout.extension_map(self.spec)
-        exts[ext_pkg.name] = ext_pkg.spec
-        self.write_easy_install_pth(exts)
-
     def deactivate(self, ext_pkg, **args):
         args.update(ignore=self.python_ignore(ext_pkg, args))
         super(Python, self).deactivate(ext_pkg, **args)
-
-        exts = spack.install_layout.extension_map(self.spec)
-        # Make deactivate idempotent
-        if ext_pkg.name in exts:
-            del exts[ext_pkg.name]
-            self.write_easy_install_pth(exts)
 
 
 class PythonExe(Executable):

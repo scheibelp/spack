@@ -979,6 +979,10 @@ class Package(object):
                         e.build_log = log_path
                         raise e
 
+
+                    if self.is_extension:
+                        self.extendee_spec.package.dependency_post_install(self)
+
                     # Ensure that something was actually installed.
                     if 'install' in self.install_phases:
                         self.sanity_check_prefix()
@@ -1123,6 +1127,12 @@ class Package(object):
                 changes to be applied when this package is run outside
                 of Spack.
 
+        """
+        pass
+
+    def dependency_post_install(spec, dependent_spec):
+        """
+        E.g. python package can create a modified .pth file
         """
         pass
 
@@ -1301,12 +1311,16 @@ class Package(object):
             return (filename in spack.install_layout.hidden_file_paths or
                     kwargs.get('ignore', lambda f: False)(filename))
 
-        tree = LinkTree(extension.prefix)
+        tree = LinkTree(extension.installCtxt.redirect_path(extension.prefix))
         conflict = tree.find_conflict(self.prefix, ignore=ignore)
         if conflict:
             raise ExtensionConflictError(conflict)
 
-        tree.merge(self.prefix, ignore=ignore)
+        # This context creates a redirected copy of the extendee's install dir
+        # if the extension is redirected
+        redirCtxt = RedirectionInstallContext(
+            self.prefix, extension.installCtxt.destdir)
+        tree.merge(self.prefix, redirCtxt, ignore=ignore)
 
     def do_deactivate(self, **kwargs):
         """Called on the extension to invoke extendee's deactivate() method."""
