@@ -376,6 +376,83 @@ class URLFetchStrategy(FetchStrategy):
         else:
             return "[no url]"
 
+#TODO: the for_package_version should return *this* (just insert the constructed fetcher into this)
+#NOTE: all stages are made in Package, so it can supply spec to this
+class FallbackFetcher(object):
+    def __init__(self, default_fetcher, spec):
+        self.default_fetcher = default_fetcher
+        self.mirror_path = mirror.mirror_archive_path(spec, default_fetcher)
+
+    def fetch(self, mirror_only=False):   
+        fetchers = []
+        if not mirror_only:
+            fetchers.append(self.default_fetcher)
+        
+        self.skip_checksum_for_mirror = True
+        if self.mirror_path:
+            mirrors = spack.config.get_config('mirrors')
+
+            # Join URLs of mirror roots with mirror paths. Because
+            # urljoin() will strip everything past the final '/' in
+            # the root, so we add a '/' if it is not present.
+            mirror_roots = [root if root.endswith('/') else root + '/'
+                            for root in mirrors.values()]
+            urls = [urljoin(root, self.mirror_path) for root in mirror_roots]
+
+            # If this archive is normally fetched from a tarball URL,
+            # then use the same digest.  `spack mirror` ensures that
+            # the checksum will be the same.
+            digest = None
+            expand = True
+            if isinstance(self.default_fetcher, fs.URLFetchStrategy):
+                digest = self.default_fetcher.digest
+                expand = self.default_fetcher.expand_archive
+
+            # Have to skip the checksum for things archived from
+            # repositories.  How can this be made safer?
+            self.skip_checksum_for_mirror = not bool(digest)
+
+            # Add URL strategies for all the mirrors with the digest
+            for url in urls:
+                fetchers.insert(
+                    0, fs.URLFetchStrategy(url, digest, expand=expand))
+            fetchers.insert(
+                0, spack.fetch_cache.fetcher(
+                    self.mirror_path, digest, expand=expand))
+
+            # Look for the archive in list_url
+            package_name = os.path.dirname(self.mirror_path)
+            pkg = spack.repo.get(package_name)
+            if pkg.list_url is not None and pkg.url is not None:
+                try:
+                    archive_version = spack.url.parse_version(
+                        self.default_fetcher.url)
+                    versions = pkg.fetch_remote_versions()
+                    try:
+                        url_from_list = versions[Version(archive_version)]
+                        fetchers.append(fs.URLFetchStrategy(
+                            url_from_list, digest))
+                    except KeyError:
+                        tty.msg("Can not find version %s in url_list" %
+                                archive_version)
+                except:
+                    tty.msg("Could not determine url from list_url.")
+
+        for fetcher in fetchers:
+            try:
+                fetcher.set_stage(self)
+                self.fetcher = fetcher
+                self.fetcher.fetch()
+                break
+            except spack.error.SpackError as e:
+                tty.msg("Fetching from %s failed." % fetcher)
+                tty.debug(e)
+                continue
+        else:
+            errMessage = "All fetchers failed for %s" % self.name
+            self.fetcher = self.default_fetcher
+            raise fs.FetchError(errMessage, None)
+
 
 class CacheURLFetchStrategy(URLFetchStrategy):
     """The resource associated with a cache URL may be out of date."""

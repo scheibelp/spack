@@ -88,8 +88,8 @@ class Stage(object):
     similar, and are intended to persist for only one run of spack.
     """
 
-    def __init__(self, url_or_fetch_strategy,
-                 name=None, mirror_path=None, keep=False, path=None):
+    def __init__(self, fetch_strategy,
+                 name=None, keep=False, path=None):
         """Create a stage object.
            Parameters:
              url_or_fetch_strategy
@@ -102,29 +102,15 @@ class Stage(object):
                  stage object later).  If name is not provided, then this
                  stage will be given a unique name automatically.
 
-             mirror_path
-                 If provided, Stage will search Spack's mirrors for
-                 this archive at the mirror_path, before using the
-                 default fetch strategy.
-
              keep
                  By default, when used as a context manager, the Stage
                  is deleted on exit when no exceptions are raised.
                  Pass True to keep the stage intact even if no
                  exceptions are raised.
         """
-        # TODO: fetch/stage coupling needs to be reworked -- the logic
-        # TODO: here is convoluted and not modular enough.
-        if isinstance(url_or_fetch_strategy, basestring):
-            self.fetcher = fs.from_url(url_or_fetch_strategy)
-        elif isinstance(url_or_fetch_strategy, fs.FetchStrategy):
-            self.fetcher = url_or_fetch_strategy
-        else:
-            raise ValueError(
-                "Can't construct Stage without url or fetch strategy")
+        self.fetcher = fetch_strategy
         self.fetcher.set_stage(self)
-        # self.fetcher can change with mirrors.
-        self.default_fetcher = self.fetcher
+        
         # used for mirrored archives of repositories.
         self.skip_checksum_for_mirror = True
 
@@ -134,7 +120,6 @@ class Stage(object):
         self.name = name
         if name is None:
             self.name = STAGE_PREFIX + next(tempfile._get_candidate_names())
-        self.mirror_path = mirror_path
         self.tmp_root = find_tmp_root()
 
         # Try to construct here a temporary name for the stage directory
@@ -213,27 +198,11 @@ class Stage(object):
         return False
 
     @property
-    def expected_archive_files(self):
-        """Possible archive file paths."""
-        paths = []
-        if isinstance(self.default_fetcher, fs.URLFetchStrategy):
-            paths.append(os.path.join(
-                self.path, os.path.basename(self.default_fetcher.url)))
-
-        if self.mirror_path:
-            paths.append(os.path.join(
-                self.path, os.path.basename(self.mirror_path)))
-
-        return paths
-
-    @property
     def archive_file(self):
         """Path to the source archive within this stage directory."""
-        for path in self.expected_archive_files:
-            if os.path.exists(path):
-                return path
-        else:
-            return None
+        test_path = join_path(self.path, self.fetcher.archive_file)
+        if os.path.exists(test_path):
+            return path
 
     @property
     def source_path(self):
@@ -270,91 +239,12 @@ class Stage(object):
         """Downloads an archive or checks out code from a repository."""
         self.chdir()
 
-        fetchers = []
-        if not mirror_only:
-            fetchers.append(self.default_fetcher)
-
-        # TODO: move mirror logic out of here and clean it up!
-        # TODO: Or @alalazo may have some ideas about how to use a
-        # TODO: CompositeFetchStrategy here.
-        self.skip_checksum_for_mirror = True
-        if self.mirror_path:
-            mirrors = spack.config.get_config('mirrors')
-
-            # Join URLs of mirror roots with mirror paths. Because
-            # urljoin() will strip everything past the final '/' in
-            # the root, so we add a '/' if it is not present.
-            mirror_roots = [root if root.endswith('/') else root + '/'
-                            for root in mirrors.values()]
-            urls = [urljoin(root, self.mirror_path) for root in mirror_roots]
-
-            # If this archive is normally fetched from a tarball URL,
-            # then use the same digest.  `spack mirror` ensures that
-            # the checksum will be the same.
-            digest = None
-            expand = True
-            if isinstance(self.default_fetcher, fs.URLFetchStrategy):
-                digest = self.default_fetcher.digest
-                expand = self.default_fetcher.expand_archive
-
-            # Have to skip the checksum for things archived from
-            # repositories.  How can this be made safer?
-            self.skip_checksum_for_mirror = not bool(digest)
-
-            # Add URL strategies for all the mirrors with the digest
-            for url in urls:
-                fetchers.insert(
-                    0, fs.URLFetchStrategy(url, digest, expand=expand))
-            fetchers.insert(
-                0, spack.fetch_cache.fetcher(
-                    self.mirror_path, digest, expand=expand))
-
-            # Look for the archive in list_url
-            package_name = os.path.dirname(self.mirror_path)
-            pkg = spack.repo.get(package_name)
-            if pkg.list_url is not None and pkg.url is not None:
-                try:
-                    archive_version = spack.url.parse_version(
-                        self.default_fetcher.url)
-                    versions = pkg.fetch_remote_versions()
-                    try:
-                        url_from_list = versions[Version(archive_version)]
-                        fetchers.append(fs.URLFetchStrategy(
-                            url_from_list, digest))
-                    except KeyError:
-                        tty.msg("Can not find version %s in url_list" %
-                                archive_version)
-                except:
-                    tty.msg("Could not determine url from list_url.")
-
-        for fetcher in fetchers:
-            try:
-                fetcher.set_stage(self)
-                self.fetcher = fetcher
-                self.fetcher.fetch()
-                break
-            except spack.error.SpackError as e:
-                tty.msg("Fetching from %s failed." % fetcher)
-                tty.debug(e)
-                continue
-        else:
-            errMessage = "All fetchers failed for %s" % self.name
-            self.fetcher = self.default_fetcher
-            raise fs.FetchError(errMessage, None)
+        self.fetcher.fetch() #TODO: tell fetcher when only mirrors should be used
 
     def check(self):
         """Check the downloaded archive against a checksum digest.
            No-op if this stage checks code out of a repository."""
-        if self.fetcher is not self.default_fetcher and \
-           self.skip_checksum_for_mirror:
-            tty.warn("Fetching from mirror without a checksum!",
-                     "This package is normally checked out from a version "
-                     "control system, but it has been archived on a spack "
-                     "mirror.  This means we cannot know a checksum for the "
-                     "tarball in advance. Be sure that your connection to "
-                     "this mirror is secure!.")
-        else:
-            self.fetcher.check()
+        self.fetcher.check()
 
     def cache_local(self):
         spack.fetch_cache.store(self.fetcher, self.mirror_path)
