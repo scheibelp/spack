@@ -44,31 +44,9 @@ from spack.version import *
 from spack.util.compression import allowed_archive
 
 
-def mirror_archive_filename(spec, fetcher):
-    """Get the name of the spec's archive in the mirror."""
-    if not spec.version.concrete:
-        raise ValueError("mirror.path requires spec with concrete version.")
-
-    if isinstance(fetcher, fs.URLFetchStrategy):
-        if fetcher.expand_archive:
-            # If we fetch with a URLFetchStrategy, use URL's archive type
-            ext = url.downloaded_file_extension(fetcher.url)
-        else:
-            # If the archive shouldn't be expanded, don't check extension.
-            ext = None
-    else:
-        # Otherwise we'll make a .tar.gz ourselves
-        ext = 'tar.gz'
-
-    filename = "%s-%s" % (spec.package.name, spec.version)
-    if ext:
-        filename += ".%s" % ext
-    return filename
-
-
 def mirror_archive_path(spec, fetcher):
     """Get the relative path to the spec's archive within a mirror."""
-    return join_path(spec.name, mirror_archive_filename(spec, fetcher))
+    return join_path(spec.name, fetcher.mirror_archive_filename(spec))
 
 
 def get_matching_versions(specs, **kwargs):

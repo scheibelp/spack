@@ -125,6 +125,20 @@ class FetchStrategy(object):
     def matches(cls, args):
         return any(k in args for k in cls.required_attributes)
 
+    def mirror_archive_filename(self, spec):
+        """Get the name of the spec's archive in the mirror."""
+        if not spec.version.concrete:
+            raise ValueError("mirror.path requires spec with concrete version.")
+
+        ext = self.get_extension()
+
+        filename = "%s-%s" % (spec.package.name, spec.version)
+        if ext:
+            filename += ".%s" % ext
+        return filename
+
+    def get_extension(self):
+        pass
 
 @pattern.composite(interface=FetchStrategy)
 class FetchStrategyComposite(object):
@@ -161,6 +175,13 @@ class URLFetchStrategy(FetchStrategy):
 
         if not self.url:
             raise ValueError("URLFetchStrategy requires a url for fetching.")
+
+    def get_extension(self):
+        if self.expand_archive:
+            #TODO: raise an exception if this cannot be determined, since
+            #normally returning no extension means the resource doesnt need
+            #to be compressed
+            return url.downloaded_file_extension(self.url)
 
     @_needs_stage
     def fetch(self):
@@ -394,6 +415,11 @@ class VCSFetchStrategy(FetchStrategy):
         # Set attributes for each rev type.
         for rt in rev_types:
             setattr(self, rt, kwargs.get(rt, None))
+
+    def get_extension(self):
+        # All VCS fetchers will download in an expanded form and can then
+        # archive to whatever extension they want, so we always choose tar.gz
+        return 'tar.gz'
 
     @_needs_stage
     def check(self):
