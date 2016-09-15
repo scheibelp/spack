@@ -227,15 +227,6 @@ class Stage(object):
         return paths
 
     @property
-    def save_filename(self):
-        possible_filenames = self.expected_archive_files
-        if possible_filenames:
-            # This prefers using the URL associated with the default fetcher if
-            # available, so that the fetched resource name matches the remote
-            # name
-            return possible_filenames[0]
-
-    @property
     def archive_file(self):
         """Path to the source archive within this stage directory."""
         for path in self.expected_archive_files:

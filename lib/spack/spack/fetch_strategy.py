@@ -183,6 +183,9 @@ class URLFetchStrategy(FetchStrategy):
             #to be compressed
             return url.downloaded_file_extension(self.url)
 
+    def save_filename(self):
+        return os.path.basename(self.url)
+
     @_needs_stage
     def fetch(self):
         self.stage.chdir()
@@ -193,9 +196,9 @@ class URLFetchStrategy(FetchStrategy):
 
         save_file = None
         partial_file = None
-        if self.stage.save_filename:
-            save_file = self.stage.save_filename
-            partial_file = self.stage.save_filename + '.part'
+        if self.save_filename:
+            save_file = self.save_filename
+            partial_file = self.save_filename + '.part'
 
         tty.msg("Trying to fetch from %s" % self.url)
 
