@@ -140,6 +140,10 @@ class FetchStrategy(object):
     def get_extension(self):
         pass
 
+    #TODO: why did i put this here?
+    def relative_source_path(self):
+        pass
+
 @pattern.composite(interface=FetchStrategy)
 class FetchStrategyComposite(object):
 
@@ -278,7 +282,9 @@ class URLFetchStrategy(FetchStrategy):
     @property
     def archive_file(self):
         """Path to the source archive within this stage directory."""
-        return self.stage.archive_file
+        test_path = join_path(self.stage.path, self.save_filename)
+        if os.path.exists(test_path):
+            return test_path
 
     @_needs_stage
     def expand(self):
@@ -376,12 +382,11 @@ class URLFetchStrategy(FetchStrategy):
         else:
             return "[no url]"
 
-#TODO: the for_package_version should return *this* (just insert the constructed fetcher into this)
-#NOTE: all stages are made in Package, so it can supply spec to this
 class FallbackFetcher(object):
     def __init__(self, default_fetcher, spec):
         self.default_fetcher = default_fetcher
         self.mirror_path = mirror.mirror_archive_path(spec, default_fetcher)
+        self.successful_fetcher = None
 
     def fetch(self, mirror_only=False):   
         fetchers = []
@@ -441,8 +446,8 @@ class FallbackFetcher(object):
         for fetcher in fetchers:
             try:
                 fetcher.set_stage(self)
-                self.fetcher = fetcher
-                self.fetcher.fetch()
+                fetcher.fetch()
+                self.successful_fetcher = fetcher
                 break
             except spack.error.SpackError as e:
                 tty.msg("Fetching from %s failed." % fetcher)
@@ -450,9 +455,16 @@ class FallbackFetcher(object):
                 continue
         else:
             errMessage = "All fetchers failed for %s" % self.name
-            self.fetcher = self.default_fetcher
             raise fs.FetchError(errMessage, None)
 
+    def archive(self, destination):
+        self.successful_fetcher.archive(destination)
+    
+    def check(self):
+        self.successful_fetcher.check()
+    
+    def expand(self):
+        self.successful_fetcher.expand()
 
 class CacheURLFetchStrategy(URLFetchStrategy):
     """The resource associated with a cache URL may be out of date."""
@@ -512,7 +524,6 @@ class VCSFetchStrategy(FetchStrategy):
     @_needs_stage
     def archive(self, destination, **kwargs):
         assert (extension(destination) == 'tar.gz')
-        assert (self.stage.source_path.startswith(self.stage.path))
 
         tar = which('tar', required=True)
 

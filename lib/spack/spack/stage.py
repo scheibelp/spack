@@ -198,13 +198,6 @@ class Stage(object):
         return False
 
     @property
-    def archive_file(self):
-        """Path to the source archive within this stage directory."""
-        test_path = join_path(self.path, self.fetcher.archive_file)
-        if os.path.exists(test_path):
-            return path
-
-    @property
     def source_path(self):
         """Returns the path to the expanded/checked out source code.
 
@@ -218,14 +211,13 @@ class Stage(object):
         file, it will just return the stage path. If the archive needs
         to be expanded, it will return None when no archive is found.
         """
-        if isinstance(self.fetcher, fs.URLFetchStrategy):
-            if not self.fetcher.expand_archive:
-                return self.path
-
-        for p in [os.path.join(self.path, f) for f in os.listdir(self.path)]:
+        child_paths = [
+            os.path.join(self.path, f) for f in os.listdir(self.path)]
+        for p in child_paths:
             if os.path.isdir(p):
                 return p
-        return None
+        
+        return self.path
 
     def chdir(self):
         """Changes directory to the stage path. Or dies if it is not set
@@ -239,7 +231,7 @@ class Stage(object):
         """Downloads an archive or checks out code from a repository."""
         self.chdir()
 
-        self.fetcher.fetch() #TODO: tell fetcher when only mirrors should be used
+        self.fetcher.fetch(mirror_only=mirror_only)
 
     def check(self):
         """Check the downloaded archive against a checksum digest.
@@ -318,8 +310,8 @@ class Stage(object):
 
 class ResourceStage(Stage):
 
-    def __init__(self, url_or_fetch_strategy, root, resource, **kwargs):
-        super(ResourceStage, self).__init__(url_or_fetch_strategy, **kwargs)
+    def __init__(self, fetcher, root, resource, **kwargs):
+        super(ResourceStage, self).__init__(fetcher, **kwargs)
         self.root_stage = root
         self.resource = resource
 
@@ -437,12 +429,6 @@ class DIYStage(object):
 
     def cache_local(self):
         tty.msg("Sources for DIY stages are not cached")
-
-
-def _get_mirrors():
-    """Get mirrors from spack configuration."""
-    config = spack.config.get_config('mirrors')
-    return [val for name, val in config.iteritems()]
 
 
 def ensure_access(file=spack.stage_path):

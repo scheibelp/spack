@@ -500,12 +500,11 @@ class Package(object):
 
     def _make_root_stage(self, fetcher):
         # Construct a mirror path (TODO: get this out of package.py)
-        mp = spack.mirror.mirror_archive_path(self.spec, fetcher)
         # Construct a path where the stage should build..
         s = self.spec
         stage_name = "%s-%s-%s" % (s.name, s.version, s.dag_hash())
         # Build the composite stage
-        stage = Stage(fetcher, mirror_path=mp, name=stage_name, path=self.path)
+        stage = Stage(fetcher, name=stage_name, path=self.path)
         return stage
 
     def _make_stage(self):
@@ -516,12 +515,14 @@ class Package(object):
         for ii, fetcher in enumerate(composite_fetcher):
             if ii == 0:
                 # Construct root stage first
-                stage = self._make_root_stage(fetcher)
+                stage = self._make_root_stage(
+                    fs.FallbackFetcher(fetcher, self.spec))
             else:
                 # Construct resource stage
                 resource = resources[ii - 1]  # ii == 0 is root!
-                stage = self._make_resource_stage(composite_stage[0], fetcher,
-                                                  resource)
+                stage = self._make_resource_stage(
+                    composite_stage[0], fs.FallbackFetcher(fetcher, self.spec),
+                    resource)
             # Append the item to the composite
             composite_stage.append(stage)
 
