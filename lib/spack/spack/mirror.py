@@ -38,15 +38,29 @@ from llnl.util.filesystem import *
 import spack
 import spack.error
 import spack.url as url
-import spack.fetch_strategy as fs
 from spack.spec import Spec
 from spack.version import *
 from spack.util.compression import allowed_archive
 
 
-def mirror_archive_path(spec, fetcher):
+def mirror_archive_path(spec, fetcher, resource=None):
     """Get the relative path to the spec's archive within a mirror."""
-    return join_path(spec.name, fetcher.mirror_archive_filename(spec))
+    return join_path(
+        spec.name, mirror_archive_filename(spec, fetcher, resource))
+
+
+def mirror_archive_filename(spec, fetcher, resource=None):
+    """Get the name of the spec's archive in the mirror."""
+    if not spec.version.concrete:
+        raise ValueError("mirror.path requires spec with concrete version.")
+
+    ext = fetcher.get_extension()
+
+    archive_id = resource.name if resource else spec.package.name
+    filename = "%s-%s" % (archive_id, spec.version)
+    if ext:
+        filename += ".%s" % ext
+    return filename
 
 
 def get_matching_versions(specs, **kwargs):
@@ -176,7 +190,8 @@ def add_single_spec(spec, mirror_root, categories, **kwargs):
                 else:
                     resource = stage.resource
                     archive_path = join_path(
-                        subdir, suggest_archive_basename(resource))
+                        mirror_root, 
+                        mirror_archive_path(spec, fetcher, resource))
                     name = "{resource} ({pkg}).".format(
                         resource=resource.name, pkg=spec.format("$_$@"))
                 subdir = os.path.dirname(archive_path)

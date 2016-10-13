@@ -50,6 +50,8 @@ import llnl.util.tty as tty
 from llnl.util.filesystem import *
 import spack
 import spack.error
+from spack.mirror import mirror_archive_path
+import spack.url as url
 import spack.util.crypto as crypto
 from spack.util.executable import *
 from spack.util.string import *
@@ -124,18 +126,6 @@ class FetchStrategy(object):
     @classmethod
     def matches(cls, args):
         return any(k in args for k in cls.required_attributes)
-
-    def mirror_archive_filename(self, spec):
-        """Get the name of the spec's archive in the mirror."""
-        if not spec.version.concrete:
-            raise ValueError("mirror.path requires spec with concrete version.")
-
-        ext = self.get_extension()
-
-        filename = "%s-%s" % (spec.package.name, spec.version)
-        if ext:
-            filename += ".%s" % ext
-        return filename
 
     def get_extension(self):
         pass
@@ -383,9 +373,9 @@ class URLFetchStrategy(FetchStrategy):
             return "[no url]"
 
 class FallbackFetcher(object):
-    def __init__(self, default_fetcher, spec):
+    def __init__(self, default_fetcher, spec, resource=None):
         self.default_fetcher = default_fetcher
-        self.mirror_path = mirror.mirror_archive_path(spec, default_fetcher)
+        self.mirror_path = mirror_archive_path(spec, default_fetcher, resource)
         self.successful_fetcher = None
 
     def fetch(self, mirror_only=False):   
@@ -465,6 +455,7 @@ class FallbackFetcher(object):
     
     def expand(self):
         self.successful_fetcher.expand()
+
 
 class CacheURLFetchStrategy(URLFetchStrategy):
     """The resource associated with a cache URL may be out of date."""

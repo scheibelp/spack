@@ -489,12 +489,10 @@ class Package(object):
 
     def _make_resource_stage(self, root_stage, fetcher, resource):
         resource_stage_folder = self._resource_stage(resource)
-        resource_mirror = join_path(self.name, os.path.basename(fetcher.url))
         stage = ResourceStage(resource.fetcher,
                               root=root_stage,
                               resource=resource,
                               name=resource_stage_folder,
-                              mirror_path=resource_mirror,
                               path=self.path)
         return stage
 
@@ -521,7 +519,8 @@ class Package(object):
                 # Construct resource stage
                 resource = resources[ii - 1]  # ii == 0 is root!
                 stage = self._make_resource_stage(
-                    composite_stage[0], fs.FallbackFetcher(fetcher, self.spec),
+                    composite_stage[0], 
+                    fs.FallbackFetcher(fetcher, self.spec, resource),
                     resource)
             # Append the item to the composite
             composite_stage.append(stage)

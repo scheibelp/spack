@@ -54,9 +54,6 @@ cache_path     = join_path(var_path, "cache")
 # User configuration location
 user_config_path = os.path.expanduser('~/.spack')
 
-import spack.fetch_strategy
-fetch_cache = spack.fetch_strategy.FsCache(cache_path)
-
 from spack.file_cache import FileCache
 user_cache_path = join_path(user_config_path, 'cache')
 user_cache = FileCache(user_cache_path)
@@ -65,6 +62,9 @@ prefix = spack_root
 opt_path       = join_path(prefix, "opt")
 install_path   = join_path(opt_path, "spack")
 etc_path       = join_path(prefix, "etc")
+
+import spack.fetch_strategy
+fetch_cache = spack.fetch_strategy.FsCache(cache_path)
 
 #
 # Set up the default packages database.
