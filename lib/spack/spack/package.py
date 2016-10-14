@@ -376,12 +376,7 @@ class Package(object):
             raise ValueError("In package %s: %s" % (self.name, e.message))
 
         # stage used to build this package.
-        stage_name = "%s-%s-%s" % (spec.name, spec.version, spec.dag_hash())
-        self.stage = Stage(name=stage_name, path=self.path)
-
-        # Init fetch strategy and url to None
-        self._fetcher = None
-        self.url = getattr(self.__class__, 'url', None)
+        self.stage, self.fetcher = self.set_up_stage()
 
         # Fix up self.url if this package fetches with a URLFetchStrategy.
         # This makes self.url behave sanely.
@@ -635,38 +630,31 @@ class Package(object):
                               path=self.path)
         return stage
 
-    def make_stage(self):
-        fetch_actions = list()
-        
+    def set_up_stage(self):
         cmp_stage = StageComposite()
+        cmp_fetcher = fs.FetchStrategyComposite()
         
         spec = self.spec
         stage_name = "%s-%s-%s" % (spec.name, spec.version, spec.dag_hash())
         root_stage = Stage(name=stage_name, path=self.path)
+
         root_fetcher = fs.FallbackFetcher(
             fs.for_package_version(self, self.version), self.spec)
-        
-        fetch_actions.append(FetchAction(root_fetcher, root_stage))
+        root_fetcher.set_stage(root_stage)
+
+        cmp_fetcher.append(root_fetcher)
         cmp_stage.append(root_stage)
         
         resources = list(self._get_needed_resources())
         for r in resources:
             resource_stage = self._make_resource_stage(self.stage, r)
             resource_fetcher = fs.FallbackFetcher(r.fetcher, self.spec, r)
-            fetch_actions.append(FetchAction(resource_fetcher, resource_stage))
+            resource_fetcher.set_stage(resource_stage)
+
+            cmp_fetcher.append(resource_fetcher)
             cmp_stage.append(resource_stage)
         
-        return cmp_stage, fetch_actions
-        """
-        As things are fetched into resource stages they should be added to the
-        root stage which can then handle resetting all components etc. The 
-        fetchers should provide their corresponding stages with Source objects
-        that can be expanded etc. For now those Source objects will be thin
-        wrappers around Fetcher but later own they will omit that logic.
-        
-        This means that instead of being a composite, the root stage should be
-        capable of adding resource stages
-        """
+        return cmp_stage, cmp_fetcher
 
     def _get_needed_resources(self):
         resources = []
