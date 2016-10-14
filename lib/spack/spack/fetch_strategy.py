@@ -372,11 +372,14 @@ class URLFetchStrategy(FetchStrategy):
         else:
             return "[no url]"
 
-class FallbackFetcher(FetchStrategy):
+class FallbackFetcher(object):
     def __init__(self, default_fetcher, spec, resource=None):
         self.default_fetcher = default_fetcher
         self.mirror_path = mirror_archive_path(spec, default_fetcher, resource)
         self.successful_fetcher = None
+
+    def set_stage(self, stage)
+        self.stage = stage
 
     def fetch(self, mirror_only=False):   
         fetchers = []
@@ -456,15 +459,6 @@ class FallbackFetcher(FetchStrategy):
     
     def expand(self):
         self.successful_fetcher.expand()
-
-    def reset(self):
-        self.successful_fetcher.reset()
-
-    def archive(self, destination):
-        self.successful_fetcher.archive(destination)
-
-    def __str__(self):
-        return self.__class__.__name__
 
 
 class CacheURLFetchStrategy(URLFetchStrategy):
