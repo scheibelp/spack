@@ -638,23 +638,25 @@ class Package(object):
     def make_stage(self):
         fetch_actions = list()
         
-        composite = StageComposite()
+        cmp_stage = StageComposite()
         
         spec = self.spec
         stage_name = "%s-%s-%s" % (spec.name, spec.version, spec.dag_hash())
         root_stage = Stage(name=stage_name, path=self.path)
-        root_fetcher = fs.for_package_version(self, self.version)
+        root_fetcher = fs.FallbackFetcher(
+            fs.for_package_version(self, self.version), self.spec)
         
         fetch_actions.append(FetchAction(root_fetcher, root_stage))
-        composite.append(root_stage)
+        cmp_stage.append(root_stage)
         
         resources = list(self._get_needed_resources())
         for r in resources:
             resource_stage = self._make_resource_stage(self.stage, r)
-            fetch_actions.append(FetchAction(r.fetcher, resource_stage))
-            composite.append(resource_stage)
+            resource_fetcher = fs.FallbackFetcher(r.fetcher, self.spec, r)
+            fetch_actions.append(FetchAction(resource_fetcher, resource_stage))
+            cmp_stage.append(resource_stage)
         
-        return stage, fetch_actions
+        return cmp_stage, fetch_actions
         """
         As things are fetched into resource stages they should be added to the
         root stage which can then handle resetting all components etc. The 
