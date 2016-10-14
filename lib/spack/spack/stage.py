@@ -121,6 +121,8 @@ class Stage(object):
         else:
             self.path = join_path(spack.stage_path, self.name)
 
+        self.source = None
+
         # Flag to decide whether to delete the stage folder on exit or not
         self.keep = keep
 
@@ -268,12 +270,17 @@ class Stage(object):
         except OSError:
             os.chdir(os.path.dirname(self.path))
 
+    def expand_archive(self):
+        """Changes to the stage directory and attempt to expand the downloaded
+        archive.  Fail if the stage is not set up or if the archive is not yet
+        downloaded."""
+        self.source.expand()
     
     def restage(self):
         """Removes the expanded archive path if it exists, then re-expands
            the archive.
         """
-        self.fetcher.reset()
+        self.source.reset()
 
 class ResourceStage(Stage):
 
@@ -282,7 +289,8 @@ class ResourceStage(Stage):
         self.root_stage = root
         self.resource = resource
 
-    def place_resource(self):
+    def expand_archive(self):
+        super(ResourceStage, self).expand_archive()
         root_stage = self.root_stage
         resource = self.resource
         placement = os.path.basename(self.source_path) \
@@ -314,7 +322,7 @@ class ResourceStage(Stage):
                 shutil.move(source_path, destination_path)
 
 
-@pattern.composite(method_list=['create', 'restage', 'destroy'])
+@pattern.composite(method_list=['create', 'restage', 'destroy', 'expand_archive'])
 class StageComposite:
     """Composite for Stage type objects. The first item in this composite is
     considered to be the root package, and operations that return a value are

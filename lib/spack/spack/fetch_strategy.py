@@ -76,6 +76,16 @@ def _needs_stage(fun):
     return wrapper
 
 
+class Source(object):
+    def __init__(self, fetcher):
+        self.fetcher = fetcher
+
+    def expand(self):
+        self.fetcher.expand()
+   
+    def reset(self):
+        self.fetcher.reset()
+
 class FetchStrategy(object):
 
     """Superclass of all fetch strategies."""
@@ -128,10 +138,6 @@ class FetchStrategy(object):
         return any(k in args for k in cls.required_attributes)
 
     def get_extension(self):
-        pass
-
-    #TODO: why did i put this here?
-    def relative_source_path(self):
         pass
 
 @pattern.composite(interface=FetchStrategy)
@@ -441,7 +447,7 @@ class FallbackFetcher(object):
                 fetcher.set_stage(self.stage)
                 fetcher.fetch()
                 self.successful_fetcher = fetcher
-                self.successful_fetcher.expand()
+                self.stage.source = Source(successful_fetcher)
                 break
             except spack.error.SpackError as e:
                 tty.msg("Fetching from %s failed." % fetcher)
@@ -456,9 +462,6 @@ class FallbackFetcher(object):
     
     def check(self):
         self.successful_fetcher.check()
-    
-    def expand(self):
-        self.successful_fetcher.expand()
 
 
 class CacheURLFetchStrategy(URLFetchStrategy):
