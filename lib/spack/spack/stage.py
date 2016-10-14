@@ -35,7 +35,6 @@ import spack.util.pattern as pattern
 
 import spack
 import spack.config
-import spack.fetch_strategy as fs
 import spack.error
 from spack.version import *
 
@@ -88,14 +87,9 @@ class Stage(object):
     similar, and are intended to persist for only one run of spack.
     """
 
-    def __init__(self, fetch_strategy,
-                 name=None, keep=False, path=None):
+    def __init__(self, name=None, keep=False, path=None):
         """Create a stage object.
            Parameters:
-             url_or_fetch_strategy
-                 URL of the archive to be downloaded into this stage, OR
-                 a valid FetchStrategy.
-
              name
                  If a name is provided, then this stage is a named stage
                  and will persist between runs (or if you construct another
@@ -108,8 +102,6 @@ class Stage(object):
                  Pass True to keep the stage intact even if no
                  exceptions are raised.
         """
-        self.fetcher = fetch_strategy
-        self.fetcher.set_stage(self)
         
         # used for mirrored archives of repositories.
         self.skip_checksum_for_mirror = True
@@ -227,31 +219,6 @@ class Stage(object):
         else:
             raise ChdirError("Setup failed: no such directory: " + self.path)
 
-    def fetch(self, mirror_only=False):
-        """Downloads an archive or checks out code from a repository."""
-        self.chdir()
-
-        self.fetcher.fetch(mirror_only=mirror_only)
-
-    def check(self):
-        """Check the downloaded archive against a checksum digest.
-           No-op if this stage checks code out of a repository."""
-        self.fetcher.check()
-
-    def cache_local(self):
-        spack.fetch_cache.store(self.fetcher, self.mirror_path)
-
-    def expand_archive(self):
-        """Changes to the stage directory and attempt to expand the downloaded
-        archive.  Fail if the stage is not set up or if the archive is not yet
-        downloaded."""
-        archive_dir = self.source_path
-        if not archive_dir:
-            self.fetcher.expand()
-            tty.msg("Created stage in %s" % self.path)
-        else:
-            tty.msg("Already staged %s in %s" % (self.name, self.path))
-
     def chdir_to_source(self):
         """Changes directory to the expanded archive directory.
            Dies with an error if there was no expanded archive.
@@ -263,12 +230,6 @@ class Stage(object):
             os.chdir(path)
             if not os.listdir(path):
                 tty.die("Archive was empty for %s" % self.name)
-
-    def restage(self):
-        """Removes the expanded archive path if it exists, then re-expands
-           the archive.
-        """
-        self.fetcher.reset()
 
     def create(self):
         """
@@ -307,16 +268,21 @@ class Stage(object):
         except OSError:
             os.chdir(os.path.dirname(self.path))
 
+    
+    def restage(self):
+        """Removes the expanded archive path if it exists, then re-expands
+           the archive.
+        """
+        self.fetcher.reset()
 
 class ResourceStage(Stage):
 
-    def __init__(self, fetcher, root, resource, **kwargs):
-        super(ResourceStage, self).__init__(fetcher, **kwargs)
+    def __init__(self, root, resource, **kwargs):
+        super(ResourceStage, self).__init__(**kwargs)
         self.root_stage = root
         self.resource = resource
 
-    def expand_archive(self):
-        super(ResourceStage, self).expand_archive()
+    def place_resource(self):
         root_stage = self.root_stage
         resource = self.resource
         placement = os.path.basename(self.source_path) \
@@ -348,8 +314,7 @@ class ResourceStage(Stage):
                 shutil.move(source_path, destination_path)
 
 
-@pattern.composite(method_list=['fetch', 'create', 'check', 'expand_archive',
-                                'restage', 'destroy', 'cache_local'])
+@pattern.composite(method_list=['create', 'restage', 'destroy'])
 class StageComposite:
     """Composite for Stage type objects. The first item in this composite is
     considered to be the root package, and operations that return a value are
@@ -411,24 +376,12 @@ class DIYStage(object):
     def chdir_to_source(self):
         self.chdir()
 
-    def fetch(self, mirror_only):
-        tty.msg("No need to fetch for DIY.")
-
-    def check(self):
-        tty.msg("No checksum needed for DIY.")
-
-    def expand_archive(self):
-        tty.msg("Using source directory: %s" % self.source_path)
-
     def restage(self):
         tty.die("Cannot restage DIY stage.")
 
     def destroy(self):
         # No need to destroy DIY stage.
         pass
-
-    def cache_local(self):
-        tty.msg("Sources for DIY stages are not cached")
 
 
 def ensure_access(file=spack.stage_path):

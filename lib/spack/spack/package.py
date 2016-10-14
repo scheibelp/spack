@@ -71,6 +71,18 @@ from spack import directory_layout
 _ALLOWED_URL_SCHEMES = ["http", "https", "ftp", "file", "git"]
 
 
+class FetchAction(object):
+    def __init__(self, fetcher, stage):
+        self.fetcher = fetcher
+        self.stage = stage
+    
+    def do_fetch(self):
+        self.fetcher.set_stage(self.stage)
+        self.fetcher.fetch()
+        #Fetcher provides stage with Source object so stage can call expand itself
+        #Resource stages can once again expand the source and as part of that move to target location
+
+
 class Package(object):
     """This is the superclass for all spack packages.
 
@@ -364,7 +376,8 @@ class Package(object):
             raise ValueError("In package %s: %s" % (self.name, e.message))
 
         # stage used to build this package.
-        self._stage = None
+        stage_name = "%s-%s-%s" % (spec.name, spec.version, spec.dag_hash())
+        self.stage = Stage(name=stage_name, path=self.path)
 
         # Init fetch strategy and url to None
         self._fetcher = None
@@ -486,89 +499,6 @@ class Package(object):
         # If we have no idea, try to substitute the version.
         return spack.url.substitute_version(
             self.nearest_url(version), self.url_version(version))
-
-    def _make_resource_stage(self, root_stage, fetcher, resource):
-        resource_stage_folder = self._resource_stage(resource)
-        stage = ResourceStage(resource.fetcher,
-                              root=root_stage,
-                              resource=resource,
-                              name=resource_stage_folder,
-                              path=self.path)
-        return stage
-
-    def _make_root_stage(self, fetcher):
-        # Construct a mirror path (TODO: get this out of package.py)
-        # Construct a path where the stage should build..
-        s = self.spec
-        stage_name = "%s-%s-%s" % (s.name, s.version, s.dag_hash())
-        # Build the composite stage
-        stage = Stage(fetcher, name=stage_name, path=self.path)
-        return stage
-
-    def _make_stage(self):
-        # Construct a composite stage on top of the composite FetchStrategy
-        composite_fetcher = self.fetcher
-        composite_stage = StageComposite()
-        resources = self._get_needed_resources()
-        for ii, fetcher in enumerate(composite_fetcher):
-            if ii == 0:
-                # Construct root stage first
-                stage = self._make_root_stage(
-                    fs.FallbackFetcher(fetcher, self.spec))
-            else:
-                # Construct resource stage
-                resource = resources[ii - 1]  # ii == 0 is root!
-                stage = self._make_resource_stage(
-                    composite_stage[0], 
-                    fs.FallbackFetcher(fetcher, self.spec, resource),
-                    resource)
-            # Append the item to the composite
-            composite_stage.append(stage)
-
-        # Create stage on first access.  Needed because fetch, stage,
-        # patch, and install can be called independently of each
-        # other, so `with self.stage:` in do_install isn't sufficient.
-        composite_stage.create()
-        return composite_stage
-
-    @property
-    def stage(self):
-        if not self.spec.concrete:
-            raise ValueError("Can only get a stage for a concrete package.")
-        if self._stage is None:
-            self._stage = self._make_stage()
-        return self._stage
-
-    @stage.setter
-    def stage(self, stage):
-        """Allow a stage object to be set to override the default."""
-        self._stage = stage
-
-    def _make_fetcher(self):
-        # Construct a composite fetcher that always contains at least
-        # one element (the root package). In case there are resources
-        # associated with the package, append their fetcher to the
-        # composite.
-        root_fetcher = fs.for_package_version(self, self.version)
-        fetcher = fs.FetchStrategyComposite()  # Composite fetcher
-        fetcher.append(root_fetcher)  # Root fetcher is always present
-        resources = self._get_needed_resources()
-        for resource in resources:
-            fetcher.append(resource.fetcher)
-        return fetcher
-
-    @property
-    def fetcher(self):
-        if not self.spec.versions.concrete:
-            raise ValueError(
-                "Can only get a fetcher for a package with concrete versions.")
-        if not self._fetcher:
-            self._fetcher = self._make_fetcher()
-        return self._fetcher
-
-    @fetcher.setter
-    def fetcher(self, f):
-        self._fetcher = f
 
     def dependencies_of_type(self, *deptypes):
         """Get subset of the dependencies with certain types."""
@@ -697,16 +627,64 @@ class Package(object):
         """
         spack.install_layout.remove_install_directory(self.spec)
 
-    def do_fetch(self, mirror_only=False):
-        """
-        Creates a stage directory and downloads the tarball for this package.
-        Working directory will be set to the stage directory.
-        """
-        if not self.spec.concrete:
-            raise ValueError("Can only fetch concrete packages.")
+    def _make_resource_stage(self, root_stage, resource):
+        resource_stage_folder = self._resource_stage(resource)
+        stage = ResourceStage(root=root_stage,
+                              resource=resource,
+                              name=resource_stage_folder,
+                              path=self.path)
+        return stage
 
-        start_time = time.time()
-        if spack.do_checksum and self.version not in self.versions:
+    def make_stage(self):
+        fetch_actions = list()
+        
+        composite = StageComposite()
+        
+        spec = self.spec
+        stage_name = "%s-%s-%s" % (spec.name, spec.version, spec.dag_hash())
+        root_stage = Stage(name=stage_name, path=self.path)
+        root_fetcher = fs.for_package_version(self, self.version)
+        
+        fetch_actions.append(FetchAction(root_fetcher, root_stage))
+        composite.append(root_stage)
+        
+        resources = list(self._get_needed_resources())
+        for r in resources:
+            resource_stage = self._make_resource_stage(self.stage, r)
+            fetch_actions.append(FetchAction(r.fetcher, resource_stage))
+            composite.append(resource_stage)
+        
+        return stage, fetch_actions
+        """
+        As things are fetched into resource stages they should be added to the
+        root stage which can then handle resetting all components etc. The 
+        fetchers should provide their corresponding stages with Source objects
+        that can be expanded etc. For now those Source objects will be thin
+        wrappers around Fetcher but later own they will omit that logic.
+        
+        This means that instead of being a composite, the root stage should be
+        capable of adding resource stages
+        """
+
+    def _get_needed_resources(self):
+        resources = []
+        # Select the resources that are needed for this build
+        for when_spec, resource_list in self.resources.items():
+            if when_spec in self.spec:
+                resources.extend(resource_list)
+        # Sorts the resources by the length of the string representing their
+        # destination. Since any nested resource must contain another
+        # resource's name in its path, it seems that should work
+        resources = sorted(resources, key=lambda res: len(res.destination))
+        return resources
+
+    def _resource_stage(self, resource):
+        pieces = ['resource', resource.name, self.spec.dag_hash()]
+        resource_stage_folder = '-'.join(pieces)
+        return resource_stage_folder
+
+    def fetch_with(self, fetcher, mirror_only=False):
+        if False: #if the fetcher doesn't support checking/is not trusted (create a FetchStrategy.is_trusted)
             tty.warn("There is no checksum on file to fetch %s safely." %
                      self.spec.format('$_$@'))
 
@@ -724,14 +702,16 @@ class Package(object):
                 raise FetchError("Will not fetch %s" %
                                  self.spec.format('$_$@'), checksum_msg)
 
-        self.stage.fetch(mirror_only)
+        start_time = time.time()
+        fetcher.fetch(mirror_only)
+        #TODO: sum fetch_times and assign to self._fetch_time
+        fetch_time = time.time() - start_time
 
-        self._fetch_time = time.time() - start_time
+        if spack.do_checksum:
+            fetcher.check()
 
-        if spack.do_checksum and self.version in self.versions:
-            self.stage.check()
-
-        self.stage.cache_local()
+        spack.fetch_cache.store(fetcher)
+        return fetch_time
 
     def do_stage(self, mirror_only=False):
         """Unpacks the fetched tarball, then changes into the expanded tarball
@@ -740,7 +720,6 @@ class Package(object):
             raise ValueError("Can only stage concrete packages.")
 
         self.do_fetch(mirror_only)
-        self.stage.expand_archive()
         self.stage.chdir_to_source()
 
     def do_patch(self):
@@ -831,23 +810,6 @@ class Package(object):
         touch(join_path(self.prefix.bin, 'fake'))
         mkdirp(self.prefix.lib)
         mkdirp(self.prefix.man1)
-
-    def _get_needed_resources(self):
-        resources = []
-        # Select the resources that are needed for this build
-        for when_spec, resource_list in self.resources.items():
-            if when_spec in self.spec:
-                resources.extend(resource_list)
-        # Sorts the resources by the length of the string representing their
-        # destination. Since any nested resource must contain another
-        # resource's name in its path, it seems that should work
-        resources = sorted(resources, key=lambda res: len(res.destination))
-        return resources
-
-    def _resource_stage(self, resource):
-        pieces = ['resource', resource.name, self.spec.dag_hash()]
-        resource_stage_folder = '-'.join(pieces)
-        return resource_stage_folder
 
     install_phases = set(['configure', 'build', 'install', 'provenance'])
 

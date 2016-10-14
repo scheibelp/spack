@@ -378,6 +378,9 @@ class FallbackFetcher(object):
         self.mirror_path = mirror_archive_path(spec, default_fetcher, resource)
         self.successful_fetcher = None
 
+    def set_stage(self, stage)
+        self.stage = stage
+
     def fetch(self, mirror_only=False):   
         fetchers = []
         if not mirror_only:
@@ -435,9 +438,10 @@ class FallbackFetcher(object):
 
         for fetcher in fetchers:
             try:
-                fetcher.set_stage(self)
+                fetcher.set_stage(self.stage)
                 fetcher.fetch()
                 self.successful_fetcher = fetcher
+                self.successful_fetcher.expand()
                 break
             except spack.error.SpackError as e:
                 tty.msg("Fetching from %s failed." % fetcher)
