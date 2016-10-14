@@ -375,12 +375,8 @@ class Package(object):
         except ValueError as e:
             raise ValueError("In package %s: %s" % (self.name, e.message))
 
-        # stage used to build this package.
-        stage_name = "%s-%s-%s" % (spec.name, spec.version, spec.dag_hash())
-        self.stage = Stage(name=stage_name, path=self.path)
+        self.stage, self.fetch_actions = self.set_up_stage()
 
-        # Init fetch strategy and url to None
-        self._fetcher = None
         self.url = getattr(self.__class__, 'url', None)
 
         # Fix up self.url if this package fetches with a URLFetchStrategy.
@@ -635,7 +631,7 @@ class Package(object):
                               path=self.path)
         return stage
 
-    def make_stage(self):
+    def set_up_stage(self):
         fetch_actions = list()
         
         cmp_stage = StageComposite()
@@ -657,16 +653,6 @@ class Package(object):
             cmp_stage.append(resource_stage)
         
         return cmp_stage, fetch_actions
-        """
-        As things are fetched into resource stages they should be added to the
-        root stage which can then handle resetting all components etc. The 
-        fetchers should provide their corresponding stages with Source objects
-        that can be expanded etc. For now those Source objects will be thin
-        wrappers around Fetcher but later own they will omit that logic.
-        
-        This means that instead of being a composite, the root stage should be
-        capable of adding resource stages
-        """
 
     def _get_needed_resources(self):
         resources = []
@@ -685,7 +671,9 @@ class Package(object):
         resource_stage_folder = '-'.join(pieces)
         return resource_stage_folder
 
-    def fetch_with(self, fetcher, mirror_only=False):
+    def fetch_all(self, mirror_only=False):
+        #TODO: first step is to check all the fetchers and see if they are trusted
+        #    any untrusted fetchers should trigger a warning/prompt if do_checksum is set
         if False: #if the fetcher doesn't support checking/is not trusted (create a FetchStrategy.is_trusted)
             tty.warn("There is no checksum on file to fetch %s safely." %
                      self.spec.format('$_$@'))
@@ -705,15 +693,17 @@ class Package(object):
                                  self.spec.format('$_$@'), checksum_msg)
 
         start_time = time.time()
-        fetcher.fetch(mirror_only)
-        #TODO: sum fetch_times and assign to self._fetch_time
-        fetch_time = time.time() - start_time
+        for x in self.fetch_actions:
+            x.do_fetch(mirror_only)
+        self._fetch_time = time.time() - start_time
 
-        if spack.do_checksum:
-            fetcher.check()
+        for x in self.fetch_actions:
+            fetcher = x.fetcher
 
-        spack.fetch_cache.store(fetcher)
-        return fetch_time
+            if spack.do_checksum:
+                fetcher.check()
+
+            spack.fetch_cache.store(fetcher)
 
     def do_stage(self, mirror_only=False):
         """Unpacks the fetched tarball, then changes into the expanded tarball
@@ -721,7 +711,8 @@ class Package(object):
         if not self.spec.concrete:
             raise ValueError("Can only stage concrete packages.")
 
-        self.do_fetch(mirror_only)
+        self.fetch_all(mirror_only)
+        self.stage.expand()
         self.stage.chdir_to_source()
 
     def do_patch(self):
