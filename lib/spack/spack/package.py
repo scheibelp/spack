@@ -76,9 +76,9 @@ class FetchAction(object):
         self.fetcher = fetcher
         self.stage = stage
     
-    def do_fetch(self):
+    def do_fetch(self, mirror_only=False):
         self.fetcher.set_stage(self.stage)
-        self.fetcher.fetch()
+        self.fetcher.fetch(mirror_only)
         #Fetcher provides stage with Source object so stage can call expand itself
         #Resource stages can once again expand the source and as part of that move to target location
 
@@ -375,7 +375,7 @@ class Package(object):
         except ValueError as e:
             raise ValueError("In package %s: %s" % (self.name, e.message))
 
-        self.stage, self.fetch_actions = self.set_up_stage()
+        self.stage = None
 
         self.url = getattr(self.__class__, 'url', None)
 
@@ -671,7 +671,7 @@ class Package(object):
         resource_stage_folder = '-'.join(pieces)
         return resource_stage_folder
 
-    def fetch_all(self, mirror_only=False):
+    def fetch_all(self, fetch_actions, mirror_only=False):
         #TODO: first step is to check all the fetchers and see if they are trusted
         #    any untrusted fetchers should trigger a warning/prompt if do_checksum is set
         if False: #if the fetcher doesn't support checking/is not trusted (create a FetchStrategy.is_trusted)
@@ -693,17 +693,16 @@ class Package(object):
                                  self.spec.format('$_$@'), checksum_msg)
 
         start_time = time.time()
-        for x in self.fetch_actions:
+        for x in fetch_actions:
             x.do_fetch(mirror_only)
         self._fetch_time = time.time() - start_time
 
-        for x in self.fetch_actions:
+        for x in fetch_actions:
             fetcher = x.fetcher
 
             if spack.do_checksum:
                 fetcher.check()
-
-            spack.fetch_cache.store(fetcher)
+                fetcher.cache()
 
     def do_stage(self, mirror_only=False):
         """Unpacks the fetched tarball, then changes into the expanded tarball
@@ -711,8 +710,10 @@ class Package(object):
         if not self.spec.concrete:
             raise ValueError("Can only stage concrete packages.")
 
-        self.fetch_all(mirror_only)
-        self.stage.expand()
+        self.stage, fetch_actions = self.set_up_stage()
+        self.stage.create()
+        self.fetch_all(fetch_actions, mirror_only)
+        self.stage.expand_archive()
         self.stage.chdir_to_source()
 
     def do_patch(self):

@@ -28,7 +28,8 @@ import os
 
 import llnl.util.tty as tty
 import spack.util.crypto
-from spack.stage import Stage, FailedDownloadError
+from spack.stage import Stage
+from spack.fetch_strategy import FailedDownloadError
 
 description = "Calculate md5 checksums for files/urls."
 

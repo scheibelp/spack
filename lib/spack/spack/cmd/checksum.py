@@ -29,7 +29,8 @@ import llnl.util.tty as tty
 import spack
 import spack.cmd
 import spack.util.crypto
-from spack.stage import Stage, FailedDownloadError
+from spack.stage import Stage
+from spack.fetch_strategy import FailedDownloadError
 from spack.version import *
 
 description = "Checksum available versions of a package."

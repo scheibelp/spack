@@ -436,5 +436,3 @@ class RestageError(StageError):
 class ChdirError(StageError):
     """Raised when Spack can't change directories."""
 
-# Keep this in namespace for convenience
-FailedDownloadError = fs.FailedDownloadError

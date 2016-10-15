@@ -183,6 +183,7 @@ class URLFetchStrategy(FetchStrategy):
             #to be compressed
             return url.downloaded_file_extension(self.url)
 
+    @property
     def save_filename(self):
         return os.path.basename(self.url)
 
@@ -384,7 +385,7 @@ class FallbackFetcher(object):
         self.mirror_path = mirror_archive_path(spec, default_fetcher, resource)
         self.successful_fetcher = None
 
-    def set_stage(self, stage)
+    def set_stage(self, stage):
         self.stage = stage
 
     def fetch(self, mirror_only=False):   
@@ -408,7 +409,7 @@ class FallbackFetcher(object):
             # the checksum will be the same.
             digest = None
             expand = True
-            if isinstance(self.default_fetcher, fs.URLFetchStrategy):
+            if isinstance(self.default_fetcher, URLFetchStrategy):
                 digest = self.default_fetcher.digest
                 expand = self.default_fetcher.expand_archive
 
@@ -419,7 +420,7 @@ class FallbackFetcher(object):
             # Add URL strategies for all the mirrors with the digest
             for url in urls:
                 fetchers.insert(
-                    0, fs.URLFetchStrategy(url, digest, expand=expand))
+                    0, URLFetchStrategy(url, digest, expand=expand))
             fetchers.insert(
                 0, spack.fetch_cache.fetcher(
                     self.mirror_path, digest, expand=expand))
@@ -434,7 +435,7 @@ class FallbackFetcher(object):
                     versions = pkg.fetch_remote_versions()
                     try:
                         url_from_list = versions[Version(archive_version)]
-                        fetchers.append(fs.URLFetchStrategy(
+                        fetchers.append(URLFetchStrategy(
                             url_from_list, digest))
                     except KeyError:
                         tty.msg("Can not find version %s in url_list" %
@@ -447,15 +448,15 @@ class FallbackFetcher(object):
                 fetcher.set_stage(self.stage)
                 fetcher.fetch()
                 self.successful_fetcher = fetcher
-                self.stage.source = Source(successful_fetcher)
+                self.stage.source = Source(self.successful_fetcher)
                 break
             except spack.error.SpackError as e:
                 tty.msg("Fetching from %s failed." % fetcher)
                 tty.debug(e)
                 continue
         else:
-            errMessage = "All fetchers failed for %s" % self.name
-            raise fs.FetchError(errMessage, None)
+            errMessage = "All fetchers failed"
+            raise FetchError(errMessage, None)
 
     def archive(self, destination):
         self.successful_fetcher.archive(destination)
@@ -463,6 +464,8 @@ class FallbackFetcher(object):
     def check(self):
         self.successful_fetcher.check()
 
+    def cache(self):
+        spack.fetch_cache.store(self.successful_fetcher, self.mirror_path)
 
 class CacheURLFetchStrategy(URLFetchStrategy):
     """The resource associated with a cache URL may be out of date."""
