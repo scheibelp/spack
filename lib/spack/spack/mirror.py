@@ -41,7 +41,6 @@ import spack.url as url
 import spack.fetch_strategy as fs
 from spack.spec import Spec
 from spack.version import *
-from spack.util.compression import allowed_archive
 
 
 def mirror_archive_filename(spec, fetcher, resourceId=None):
@@ -111,21 +110,6 @@ def get_matching_versions(specs, **kwargs):
         matching.extend(matching_spec)
 
     return matching
-
-
-def suggest_archive_basename(resource):
-    """
-    Return a tentative basename for an archive.
-
-    Raises an exception if the name is not an allowed archive type.
-
-    :param fetcher:
-    :return:
-    """
-    basename = os.path.basename(resource.fetcher.url)
-    if not allowed_archive(basename):
-        raise RuntimeError("%s is not an allowed archive tye" % basename)
-    return basename
 
 
 def create(path, specs, **kwargs):
@@ -215,9 +199,27 @@ def add_single_spec(spec, mirror_root, categories, **kwargs):
                 subdir = os.path.dirname(archive_path)
                 mkdirp(subdir)
 
+                do_fetch = True
                 if os.path.exists(archive_path):
-                    tty.msg("{name} : already added".format(name=name))
-                else:
+                    do_fetch = False
+                    try:
+                        digest = fetcher.digest
+                    except AttributeError:
+                        digest = None
+
+                    if digest:
+                        checker = spack.util.crypto.Checker(digest)
+                        if not checker.check(archive_path):
+                            do_fetch = True
+                            os.remove(archive_path)
+                    elif not fetcher.cachable:
+                        do_fetch = True
+                    # Repository-based fetchers which specify a commit are not
+                    # re-downloaded and are not checked. This may be an issue
+                    # if the commit history is altered, for example if a rebase
+                    # is performed in git
+
+                if do_fetch:
                     spec_exists_in_mirror = False
                     fetcher.fetch()
                     if not kwargs.get('no_checksum', False):
@@ -228,6 +230,8 @@ def add_single_spec(spec, mirror_root, categories, **kwargs):
                     # that to move/copy/create an archive in the mirror.
                     fetcher.archive(archive_path)
                     tty.msg("{name} : added".format(name=name))
+                else:
+                    tty.msg("{name} : already added".format(name=name))
 
         if spec_exists_in_mirror:
             categories['present'].append(spec)
