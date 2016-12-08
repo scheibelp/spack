@@ -65,6 +65,7 @@ test_names = [
     'namespace_trie',
     'optional_deps',
     'package_sanity',
+    'package',
     'packages',
     'pattern',
     'python_version',
