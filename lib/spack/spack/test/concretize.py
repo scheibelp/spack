@@ -203,6 +203,16 @@ class TestConcretize(object):
         assert set(client.compiler_flags['fflags']) == set(['-O0'])
         assert not set(cmake.compiler_flags['fflags'])
 
+    def test_set_variant_none(self):
+        s1 = Spec('default-none')
+        s1.concretize()
+        assert not s1.variants['v1'].value
+        assert not s1.variants['v2'].value
+
+        s2 = Spec('default-none v1=none')
+        s2.concretize()
+        assert not s2.variants['v1'].value
+
     def test_compiler_flags_from_user_are_grouped(self):
         spec = Spec('a%gcc cflags="-O -foo-flag foo-val" platform=test')
         spec.concretize()
