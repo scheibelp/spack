@@ -209,9 +209,10 @@ class TestConcretize(object):
         assert not s1.variants['v1'].value
         assert not s1.variants['v2'].value
 
-        s2 = Spec('default-none v1=none')
+        s2 = Spec('default-none v1=none v4=none')
         s2.concretize()
         assert not s2.variants['v1'].value
+        assert not s2.variants['v4'].value
 
     def test_compiler_flags_from_user_are_grouped(self):
         spec = Spec('a%gcc cflags="-O -foo-flag foo-val" platform=test')
