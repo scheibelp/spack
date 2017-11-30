@@ -53,6 +53,12 @@ class DefaultNone(Package):
         default='none'
     )
 
+    variant(
+        'v4',
+        values=('x', 'y', 'z', None),
+        default='x'
+    )
+
     def install(self, spec, prefix):
         pass
 
