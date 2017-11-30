@@ -91,7 +91,14 @@ class Variant(object):
             # Otherwise assume values is the set of allowed explicit values
             self.values = tuple(values)
             allowed = self.values + (self.default,)
-            self.single_value_validator = lambda x: x in allowed
+            can_specify_none = (
+                any(str(x).upper() == 'NONE' for x in allowed) or
+                any(not x for x in allowed))
+
+            val_is_none = lambda x: (not x) or str(x).upper() == 'NONE'
+            self.single_value_validator = (
+                lambda x: x in allowed or
+                (can_specify_none and val_is_none(x)))
 
         self.multi = multi
         self.group_validator = validator
@@ -120,8 +127,8 @@ class Variant(object):
 
         # Check the values of the variant spec
         value = vspec.value
-        if isinstance(vspec.value, (bool, str)):
-            value = (vspec.value,)
+        if isinstance(value, (bool, str)):
+            value = (value,)
 
         # If the value is exclusive there must be at most one
         if not self.multi and len(value) != 1:

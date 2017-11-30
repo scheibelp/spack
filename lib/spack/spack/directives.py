@@ -480,7 +480,7 @@ def variant(
         else:
             values = lambda x: True
 
-    if default is None:
+    if default is None or str(default).upper() == 'NONE':
         default = False if values == (True, False) else ''
 
     default = default
