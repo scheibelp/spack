@@ -103,7 +103,8 @@ class Cray(Platform):
         """ Change the linker to default dynamic to be more
             similar to linux/standard linker behavior
         """
-        env.set('CRAYPE_LINK_TYPE', 'dynamic')
+        #env.set('CRAYPE_LINK_TYPE', 'dynamic')
+        env.set('CRAYPE_LINK_TYPE', 'static')
         cray_wrapper_names = join_path(build_env_path, 'cray')
         if os.path.isdir(cray_wrapper_names):
             env.prepend_path('PATH', cray_wrapper_names)

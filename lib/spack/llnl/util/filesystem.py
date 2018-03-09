@@ -1107,4 +1107,6 @@ def find_libraries(libraries, root, shared=True, recursive=False):
     # List of libraries we are searching with suffixes
     libraries = ['{0}.{1}'.format(lib, suffix) for lib in libraries]
 
+    tty.debug("finding... " + root + " " + str(libraries))
+
     return LibraryList(find(root, libraries, recursive))

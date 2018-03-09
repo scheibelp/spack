@@ -727,7 +727,9 @@ def _libs_default_handler(descriptor, spec, cls):
     # depending on which one exists (there is a possibility, of course, to
     # get something like 'libabcXabc.so, but for now we consider this
     # unlikely).
-    name = 'lib' + spec.name.replace('-', '?')
+    name = spec.name.replace('-', '?')
+    if not spec.name.startswith('lib'):
+        name = 'lib' + name
 
     if '+shared' in spec:
         libs = find_libraries(

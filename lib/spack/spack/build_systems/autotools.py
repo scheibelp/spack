@@ -35,6 +35,8 @@ import llnl.util.tty as tty
 from llnl.util.filesystem import working_dir, join_path, force_remove
 from spack.package import PackageBase, run_after, run_before
 from spack.util.executable import Executable
+import spack.architecture
+import spack.directives
 
 
 class AutotoolsPackage(PackageBase):
@@ -93,6 +95,9 @@ class AutotoolsPackage(PackageBase):
     force_autoreconf = False
     #: Options to be passed to autoreconf when using the default implementation
     autoreconf_extra_args = []
+
+    if str(spack.architecture.platform()) == 'cray':
+        spack.directives.variant('shared', default=False, description='build shared libs')
 
     @run_after('autoreconf')
     def _do_patch_config_guess(self):
@@ -245,6 +250,11 @@ class AutotoolsPackage(PackageBase):
 
         :return: list of arguments for configure
         """
+        if self.spec.architecture.platform == 'cray':
+            if '+shared' in self.spec:
+                return ['--enable-shared']
+            else:
+                return ['--enable-static', '--disable-shared']
         return []
 
     def flags_to_build_system_args(self, flags):

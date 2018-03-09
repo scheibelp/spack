@@ -174,6 +174,8 @@ class Openmpi(AutotoolsPackage):
     patch('configure.patch', when="@1.10.1")
     patch('fix_multidef_pmi_class.patch', when="@2.0.0:2.0.1")
 
+    variant('shared', default=True, description='Build shared libs')
+
     variant(
         'fabrics',
         default=None if _verbs_dir() is None else 'verbs',
@@ -300,10 +302,9 @@ class Openmpi(AutotoolsPackage):
 
     def configure_args(self):
         spec = self.spec
-        config_args = [
-            '--enable-shared',
-            '--enable-static'
-        ]
+        config_args = ['--enable-static']
+        if '+shared' in self.spec:
+            config_args.append('--enable-shared')
         if self.spec.satisfies('@2.0:'):
             # for Open-MPI 2.0:, C++ bindings are disabled by default.
             config_args.extend(['--enable-mpi-cxx'])
@@ -315,6 +316,7 @@ class Openmpi(AutotoolsPackage):
         # Hwloc support
         if spec.satisfies('@1.5.2:'):
             config_args.append('--with-hwloc={0}'.format(spec['hwloc'].prefix))
+            config_args.append('--with-hwloc-libdir={0}'.format(spec['hwloc'].prefix.lib))
 
         # Java support
         if spec.satisfies('@1.7.4:'):

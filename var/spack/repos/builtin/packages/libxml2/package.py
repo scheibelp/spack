@@ -37,6 +37,7 @@ class Libxml2(AutotoolsPackage):
     version('2.7.8', '8127a65e8c3b08856093099b52599c86')
 
     variant('python', default=False, description='Enable Python support')
+    variant('shared', default=True, description='Enable shared libs')
 
     extends('python', when='+python',
             ignore=r'(bin.*$)|(include.*$)|(share.*$)|(lib/libxml2.*$)|'
@@ -45,6 +46,13 @@ class Libxml2(AutotoolsPackage):
     depends_on('xz')
 
     depends_on('pkgconfig', type='build')
+
+    @property
+    def build_targets(self):
+        if '~shared' in self.spec:
+            return ['libxml2.la']
+        else:
+            return []
 
     def configure_args(self):
         spec = self.spec

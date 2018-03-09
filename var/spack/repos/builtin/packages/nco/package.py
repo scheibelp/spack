@@ -59,4 +59,6 @@ class Nco(AutotoolsPackage):
 
     def configure_args(self):
         spec = self.spec
-        return ['--{0}-doc'.format('enable' if '+doc' in spec else 'disable')]
+        args = super(Nco, self).configure_args()
+        args += ['LDFLAGS=-static -Wl,--verbose -Wl,-static']
+        return args + ['--{0}-doc'.format('enable' if '+doc' in spec else 'disable')]

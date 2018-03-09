@@ -36,3 +36,9 @@ class Udunits2(AutotoolsPackage):
     version('2.2.21', '1585a5efb2c40c00601abab036a81299')
 
     depends_on('expat')
+
+    def configure_args(self):
+        args = super(Udunits2, self).configure_args()
+        set_ld = 'LDFLAGS={0}'.format(self.transitive_link_flags())
+        args += [set_ld]
+        return args

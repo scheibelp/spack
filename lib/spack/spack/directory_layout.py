@@ -93,6 +93,8 @@ class DirectoryLayout(object):
         _check_concrete(spec)
 
         path = self.relative_path_for_spec(spec)
+        if spec.external:
+            return path
         assert(not path.startswith(self.root))
         return os.path.join(self.root, path)
 

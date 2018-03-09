@@ -565,8 +565,11 @@ def load_external_modules(pkg):
     Args:
         pkg (PackageBase): package to load deps for
     """
+    tty.debug("loading external modules")
     for dep in list(pkg.spec.traverse()):
+        tty.debug("check for external modules: " + dep.name)
         if dep.external_module:
+            tty.debug("load module for {0}: {1}".format(dep.name, dep.external_module))
             load_module(dep.external_module)
 
 

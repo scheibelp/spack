@@ -1516,6 +1516,17 @@ class PackageBase(with_metaclass(PackageMeta, object)):
             # check the filesystem for it.
             self.stage.created = False
 
+    def transitive_link_flags(self):
+        ld_flags = ' '.join(self.spec[x.name].libs.ld_flags for x in self.spec.traverse(deptype='link', order='pre', root=False))
+        flags = ld_flags.split()
+        new_flags = []
+        for f in flags:
+            if f.startswith('-l'):
+                new_flags.extend(['-Wl,--whole-archive', f, '-Wl,--no-whole-archive'])
+            else:
+                new_flags.append(f)
+        return ' '.join(new_flags)
+
     def check_for_unfinished_installation(
             self, keep_prefix=False, restage=False):
         """Check for leftover files from partially-completed prior install to
