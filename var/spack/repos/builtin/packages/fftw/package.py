@@ -126,10 +126,10 @@ class Fftw(AutotoolsPackage):
             autoreconf('-ifv')
 
     def configure(self, spec, prefix):
+        options = super(Fftw, self).configure_args()
         # Base options
-        options = [
+        options += [
             '--prefix={0}'.format(prefix),
-            '--enable-shared',
             '--enable-threads'
         ]
         if not self.compiler.f77 or not self.compiler.fc:

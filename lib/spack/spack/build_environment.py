@@ -220,6 +220,12 @@ def set_build_environment_variables(pkg, env, dirty):
     build_link_deps = build_deps | link_deps
     rpath_deps      = get_rpath_deps(pkg)
 
+    if ('~shared' in pkg.spec):
+        tty.debug("Clear rpath deps for {0}".format(pkg.spec.format()))
+        rpath_deps = []
+    else:
+        tty.debug("Keep rpath deps for {0}".format(pkg.spec.format())) 
+
     build_prefixes      = [dep.prefix for dep in build_deps]
     link_prefixes       = [dep.prefix for dep in link_deps]
     build_link_prefixes = [dep.prefix for dep in build_link_deps]

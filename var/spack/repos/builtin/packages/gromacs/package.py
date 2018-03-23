@@ -73,9 +73,29 @@ class Gromacs(CMakePackage):
         if '+plumed' in self.spec:
             self.spec['plumed'].package.apply_patch(self)
 
+        #files = list(glob.glob('CMakeLists.txt')) + list(glob.glob('*.cmake'))
+
+        cmakelists = find('.', 'CMakeLists.txt', True)
+        dotcmake = find('.', "*.cmake", True)
+        to_update = list(cmakelists) + list(dotcmake)
+        system_ff = FileFilter(*to_update)
+        system_ff.filter(r'include_directories\(SYSTEM ', r'include_directories(')
+
     def cmake_args(self):
 
         options = []
+
+        #options.append('-DCMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN:STRING=/opt/gcc/7.2.0/snos/')
+
+        #options.append('-DCMAKE_C_COMPILER=/global/homes/s/scheibel/spack/lib/spack/env/gcc/gcc')
+        #options.append('-DCMAKE_CXX_COMPILER=/global/homes/s/scheibel/spack/lib/spack/env/c++')
+
+        #options.append('-DENABLE_PRECOMPILED_HEADERS:BOOL=OFF')
+
+        #options.append('-DCMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES:STRING=/usr/include/')
+        #options.append('-DCMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES:STRING=/usr/include/')
+
+        #options.append('-DCMAKE_INCLUDE_PATH:STRING=/opt/gcc/7.2.0/snos/include/g++/')
 
         if '+mpi' in self.spec:
             options.append('-DGMX_MPI:BOOL=ON')
@@ -85,6 +105,8 @@ class Gromacs(CMakePackage):
 
         if '~shared' in self.spec:
             options.append('-DBUILD_SHARED_LIBS:BOOL=OFF')
+            options.append('-DCMAKE_SKIP_BUILD_RPATH:BOOL=TRUE')
+            options.append('-DGMX_BUILD_SHARED_EXE:BOOL=OFF')
 
         if '+cuda' in self.spec:
             options.append('-DGMX_GPU:BOOL=ON')
