@@ -60,6 +60,7 @@ class Lammps(CMakePackage):
             description='Build the liblammps in addition to the executable')
     variant('mpi', default=True,
             description='Build with mpi')
+    variant('shared', default=True, description='Build shared libs')
 
     depends_on('mpi', when='+mpi')
     depends_on('mpi', when='+mpiio')
@@ -94,11 +95,17 @@ class Lammps(CMakePackage):
         spec = self.spec
 
         args = [
-            '-DBUILD_SHARED_LIBS={0}'.format(
-                'ON' if '+lib' in spec else 'OFF'),
             '-DENABLE_MPI={0}'.format(
                 'ON' if '+mpi' in spec else 'OFF')
         ]
+
+        if '+lib' in spec:
+            if '~shared' in spec:
+                args += ['-DBUILD_SHARED_LIBS=OFF', '-DBUILD_STATIC_LIBS=ON']
+            else:
+                args += ['-DBUILD_SHARED_LIBS=ON']
+        else:
+            args += ['-DBUILD_SHARED_LIBS=OFF']
 
         for pkg in self.supported_packages:
             opt = '-DENABLE_{0}'.format(pkg.upper())

@@ -36,6 +36,8 @@ class Libxc(Package):
     version('2.2.2', 'd9f90a0d6e36df6c1312b6422280f2ec')
     version('2.2.1', '38dc3a067524baf4f8521d5bb1cd0b8f')
 
+    variant('shared', default=True, description='Build shared libraries')
+
     @property
     def libs(self):
         """Libxc can be queried for the following parameters:
@@ -81,8 +83,14 @@ class Libxc(Package):
         else:
             env['FCFLAGS'] = optflags
 
+        options = []
+        if '~shared' in spec:
+            options.append('--disable-shared')
+        else:
+            options.append('--enable-shared')
+
         configure('--prefix={0}'.format(prefix),
-                  '--enable-shared')
+                  *options)
 
         make()
 

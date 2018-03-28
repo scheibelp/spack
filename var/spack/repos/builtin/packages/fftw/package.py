@@ -82,6 +82,7 @@ class Fftw(AutotoolsPackage):
         multi=True
     )
     variant('fma', default=False, description='Activate support for fma')
+    variant('shared', default=True, description='Build shared libraries')
 
     depends_on('mpi', when='+mpi')
     depends_on('automake', type='build', when='+pfft_patches')
@@ -118,7 +119,9 @@ class Fftw(AutotoolsPackage):
 
             libraries.append('libfftw3' + sfx)
 
-        return find_libraries(libraries, root=self.prefix, recursive=True)
+        shared_libs = '+shared' in self.spec
+
+        return find_libraries(libraries, root=self.prefix, recursive=True, shared=shared_libs)
 
     def autoreconf(self, spec, prefix):
         if '+pfft_patches' in spec:

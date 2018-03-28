@@ -46,6 +46,7 @@ class Cp2k(Package):
     variant('smm', default='libxsmm', values=('libxsmm', 'libsmm', 'none'),
             description='Library for small matrix multiplications')
     variant('plumed', default=False, description='Enable PLUMED support')
+    variant('shared', default=True, description='Build shared libs')
 
     depends_on('python', type='build')
 
@@ -133,13 +134,18 @@ class Cp2k(Package):
             fftw = spec['fftw'].libs
             ldflags = [fftw.search_flags]
 
+            #if '~shared' in spec:
+            #    ldflags.extend(['-Wl,-Bstatic', '-static-libstdc++', '-static-libgcc'])
+            #    ldflags.extend(['-Wl,--gc-sections', '-Wl,--as-needed'])
+
             if 'superlu-dist@4.3' in spec:
                 ldflags = ['-Wl,--allow-multiple-definition'] + ldflags
 
+            lib_suffix = dso_suffix if '+shared' in spec else 'a'
             libs = [
-                join_path(spec['libint'].prefix.lib, 'libint.so'),
-                join_path(spec['libint'].prefix.lib, 'libderiv.so'),
-                join_path(spec['libint'].prefix.lib, 'libr12.so')
+                join_path(spec['libint'].prefix.lib, 'libderiv.{0}'.format(lib_suffix)),
+                join_path(spec['libint'].prefix.lib, 'libint.{0}'.format(lib_suffix)),
+                join_path(spec['libint'].prefix.lib, 'libr12.{0}'.format(lib_suffix))
             ]
 
             if '+plumed' in self.spec:
@@ -156,7 +162,7 @@ class Cp2k(Package):
                 cppflags.extend(['-D__PLUMED2'])
                 libs.extend([
                     join_path(self.spec['plumed'].prefix.lib,
-                              'libplumed.{0}'.format(dso_suffix))
+                              'libplumed.{0}'.format(lib_suffix))
                 ])
 
             mkf.write('CC = {0.compiler.cc}\n'.format(self))
@@ -230,17 +236,17 @@ class Cp2k(Package):
                 ldflags.append(scalapack.search_flags)
                 libs.extend([
                     join_path(elpa.prefix.lib,
-                              'libelpa.{0}'.format(dso_suffix)),
+                              'libelpa.{0}'.format(lib_suffix)),
                     join_path(spec['pexsi'].prefix.lib, 'libpexsi.a'),
                     join_path(spec['superlu-dist'].prefix.lib,
                               'libsuperlu_dist.a'),
                     join_path(
                         spec['parmetis'].prefix.lib,
-                        'libparmetis.{0}'.format(dso_suffix)
+                        'libparmetis.{0}'.format(lib_suffix)
                     ),
                     join_path(
                         spec['metis'].prefix.lib,
-                        'libmetis.{0}'.format(dso_suffix)
+                        'libmetis.{0}'.format(lib_suffix)
                     ),
                 ])
 

@@ -23,6 +23,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ##############################################################################
 from spack import *
+import inspect
 
 
 class Elpa(AutotoolsPackage):
@@ -79,7 +80,8 @@ class Elpa(AutotoolsPackage):
         # also see:
         # https://src.fedoraproject.org/cgit/rpms/elpa.git/
         # https://packages.qa.debian.org/e/elpa.html
-        options = []
+        options = super(Elpa, self).configure_args()
+        #options.append("LDFLAGS=-Wl,-Bstatic --static -static-libgcc -static-libgfortran") #-static-libtool-libs may also help? or -all-static
         # without -march=native there is configure error for 2017.05.02
         # Could not compile test program, try with --disable-sse, or
         # adjust the C compiler or CFLAGS
@@ -91,3 +93,9 @@ class Elpa(AutotoolsPackage):
         if '+openmp' in self.spec:
             options.append('--enable-openmp')
         return options
+
+    def build(self, spec, prefix):
+        with working_dir(self.build_directory):
+            # Setting LDFLAGS=-all-static for configure or in compilers.yaml does nothing
+            # or leads to an error
+            inspect.getmodule(self).make(*(self.build_targets + ['LDFLAGS=-all-static']))
