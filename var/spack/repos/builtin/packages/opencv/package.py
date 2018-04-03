@@ -44,7 +44,7 @@ class Opencv(CMakePackage):
 
     version('master', git="https://github.com/opencv/opencv.git", branch="master")
     version('3.3.0',    '98a4e4c6f23ec725e808a891dc11eec4')
-    version('3.2.0',    'a43b65488124ba33dde195fea9041b70')
+    version('3.2.0',    '1ea44a1d98c126ad40079d8eb914a72e')
     version('3.1.0',    '70e1dd07f0aa06606f1bc0e3fa15abd3')
     version('2.4.13.2', 'fe52791ce523681a67036def4c25261b')
     version('2.4.13.1', 'f6d354500d5013e60dc0fc44b07a63d1')
@@ -132,6 +132,8 @@ class Opencv(CMakePackage):
                 'ON' if '+dnn' in spec else 'OFF')),
         ]
 
+        lib_suffix = dso_suffix if '+shared' in spec else 'a'
+
         # Media I/O
         if '+zlib' in spec:
             zlib = spec['zlib']
@@ -139,7 +141,7 @@ class Opencv(CMakePackage):
                 '-DZLIB_LIBRARY_{0}:FILEPATH={1}'.format((
                     'DEBUG' if '+debug' in spec else 'RELEASE'),
                     join_path(zlib.prefix.lib,
-                              'libz.{0}'.format(dso_suffix))),
+                              'libz.{0}'.format(lib_suffix))),
                 '-DZLIB_INCLUDE_DIR:PATH={0}'.format(zlib.prefix.include)
             ])
 
@@ -149,7 +151,7 @@ class Opencv(CMakePackage):
                 '-DPNG_LIBRARY_{0}:FILEPATH={1}'.format((
                     'DEBUG' if '+debug' in spec else 'RELEASE'),
                     join_path(libpng.prefix.lib,
-                              'libpng.{0}'.format(dso_suffix))),
+                              'libpng.{0}'.format(lib_suffix))),
                 '-DPNG_INCLUDE_DIR:PATH={0}'.format(libpng.prefix.include)
             ])
 
@@ -159,7 +161,7 @@ class Opencv(CMakePackage):
                 '-DBUILD_JPEG:BOOL=OFF',
                 '-DJPEG_LIBRARY:FILEPATH={0}'.format(
                     join_path(libjpeg.prefix.lib,
-                              'libjpeg.{0}'.format(dso_suffix))),
+                              'libjpeg.{0}'.format(lib_suffix))),
                 '-DJPEG_INCLUDE_DIR:PATH={0}'.format(libjpeg.prefix.include)
             ])
 
@@ -169,7 +171,7 @@ class Opencv(CMakePackage):
                 '-DTIFF_LIBRARY_{0}:FILEPATH={1}'.format((
                     'DEBUG' if '+debug' in spec else 'RELEASE'),
                     join_path(libtiff.prefix.lib,
-                              'libtiff.{0}'.format(dso_suffix))),
+                              'libtiff.{0}'.format(lib_suffix))),
                 '-DTIFF_INCLUDE_DIR:PATH={0}'.format(libtiff.prefix.include)
             ])
 
@@ -179,7 +181,7 @@ class Opencv(CMakePackage):
                 '-DJASPER_LIBRARY_{0}:FILEPATH={1}'.format((
                     'DEBUG' if '+debug' in spec else 'RELEASE'),
                     join_path(jasper.prefix.lib,
-                              'libjasper.{0}'.format(dso_suffix))),
+                              'libjasper.{0}'.format(lib_suffix))),
                 '-DJASPER_INCLUDE_DIR:PATH={0}'.format(jasper.prefix.include)
             ])
 

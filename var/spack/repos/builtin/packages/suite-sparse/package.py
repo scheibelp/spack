@@ -42,6 +42,7 @@ class SuiteSparse(Package):
     variant('pic',  default=True,  description='Build position independent code (required to link with shared libraries)')
     variant('cuda', default=False, description='Build with CUDA')
     variant('openmp', default=False, description='Build with OpenMP')
+    variant('shared', default=True, description='Build shared libraries')
 
     depends_on('blas')
     depends_on('lapack')
@@ -124,7 +125,11 @@ class SuiteSparse(Package):
                 'TBB=-L%s -ltbb' % spec['tbb'].prefix.lib,
             ]
 
-        make('install', *make_args)
+        if '~shared' in spec:
+            make('static', *make_args)
+            self.patched_install(static=True)
+        else:
+            make('install', *make_args)
 
     @property
     def libs(self):

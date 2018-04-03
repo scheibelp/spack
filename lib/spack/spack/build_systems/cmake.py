@@ -148,10 +148,16 @@ class CMakePackage(PackageBase):
             ])
 
         # Set up CMake rpath
+        args.append('-DCMAKE_INSTALL_RPATH_USE_LINK_PATH:BOOL=FALSE')
         if not ('~shared' in pkg.spec):
-            args.append('-DCMAKE_INSTALL_RPATH_USE_LINK_PATH:BOOL=FALSE')
             rpaths = ';'.join(spack.build_environment.get_rpaths(pkg))
             args.append('-DCMAKE_INSTALL_RPATH:STRING={0}'.format(rpaths))
+        else:
+            # Without this line, cmake may attempt to alter rpaths in the
+            # statically-linked binaries during the install phase
+            args.append('-DCMAKE_BUILD_WITH_INSTALL_RPATH:BOOL=ON')
+            #args.append('-DCMAKE_SKIP_BUILD_RPATH=TRUE')
+
         # CMake's find_package() looks in CMAKE_PREFIX_PATH first, help CMake
         # to find immediate link dependencies in right places:
         deps = [d.prefix for d in

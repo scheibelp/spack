@@ -48,6 +48,7 @@ from six import string_types
 from six import with_metaclass
 
 import llnl.util.tty as tty
+import llnl.util.filesystem as filesystem
 import spack
 import spack.store
 import spack.compilers
@@ -70,6 +71,7 @@ from llnl.util.link_tree import LinkTree
 from llnl.util.tty.log import log_output
 from llnl.util.tty.color import colorize
 from spack import directory_layout
+from spack.relocate import get_filetype
 from spack.util.executable import which
 from spack.stage import Stage, ResourceStage, StageComposite
 from spack.util.environment import dump_environment
@@ -1526,6 +1528,16 @@ class PackageBase(with_metaclass(PackageMeta, object)):
             else:
                 new_flags.append(f)
         return ' '.join(new_flags)
+
+    def patched_install(self, static=False):
+        source_root = self.stage.path
+        lib_pattern = '*.a' if static else '*.so'
+        libs = filesystem.find(source_root, lib_pattern)
+        mkdirp(self.prefix.lib)
+        for lib in libs:
+            install(lib, self.prefix.lib)
+
+        #TODO: use get_filetype
 
     def check_for_unfinished_installation(
             self, keep_prefix=False, restage=False):
