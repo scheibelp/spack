@@ -41,6 +41,7 @@ class Elpa(AutotoolsPackage):
 
     variant('openmp', default=False, description='Activates OpenMP support')
     variant('optflags', default=True, description='Build with optimization flags')
+    variant('shared', default=True, description='Build shared libraries')
 
     depends_on('mpi')
     depends_on('blas')
@@ -57,8 +58,9 @@ class Elpa(AutotoolsPackage):
     @property
     def libs(self):
         libname = 'libelpa_openmp' if '+openmp' in self.spec else 'libelpa'
+        shared_libs = '+shared' in self.spec
         return find_libraries(
-            libname, root=self.prefix, shared=True, recursive=True
+            libname, root=self.prefix, shared=shared_libs, recursive=True
         )
 
     build_directory = 'spack-build'
