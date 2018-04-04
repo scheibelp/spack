@@ -36,10 +36,17 @@ class Leveldb(Package):
     version('1.20', '298b5bddf12c675d6345784261302252')
     version('1.18', '73770de34a2a5ab34498d2e05b2b7fa0')
 
+    patch('static_install.patch')
+
+    variant('shared', default=True, description='Build shared libraries')
+
     depends_on("snappy")
 
     def install(self, spec, prefix):
-        make()
+        if '+shared' in spec:
+            make()
+        else:
+            make('static')
 
         mkdirp(prefix.include)
         mkdirp(prefix.lib)
@@ -48,8 +55,9 @@ class Leveldb(Package):
         cp = which('cp')
 
         # cp --preserve=links libleveldb.* prefix/lib
-        args = glob.glob('out-shared/libleveldb.*') \
-            + glob.glob('out-static/libleveldb.*')
+        args = glob.glob('out-static/libleveldb.*')
+        if '+shared' in spec:
+            args += glob.glob('out-shared/libleveldb.*')
         args.append(prefix.lib)
         cp('--preserve=links', *args)
 

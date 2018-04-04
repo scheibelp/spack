@@ -51,6 +51,7 @@ class Caffe(CMakePackage):
             description='Build python wrapper and caffe python layer')
     variant('matlab', default=False,
             description='Build Matlab wrapper')
+    variant('shared', default=True, description='Build shared libraries')
 
     depends_on('boost')
     depends_on('boost +python', when='+python')
@@ -62,7 +63,7 @@ class Caffe(CMakePackage):
     depends_on('hdf5')
 
     # Optional dependencies
-    depends_on('opencv@3.2.0+core+highgui+imgproc', when='+opencv')
+    depends_on('opencv@3.2.0:+core+highgui+imgproc', when='+opencv')
     depends_on('leveldb', when='+leveldb')
     depends_on('lmdb', when='+lmdb')
     depends_on('python@2.7:', when='+python')
@@ -86,6 +87,9 @@ class Caffe(CMakePackage):
                 '-DGFLAGS_ROOT_DIR=%s' % spec['gflags'].prefix,
                 '-DGLOG_ROOT_DIR=%s' % spec['glog'].prefix,
                 ]
+
+        #if '~shared' in spec:
+        #    args.append('-DBUILD_SHARED_LIBS=OFF')
 
         if spec.satisfies('^openblas'):
             env['OpenBLAS_HOME'] = spec['openblas'].prefix

@@ -1,0 +1,11 @@
+--- a/Makefile	2018-03-29 18:51:29.556333000 -0700
++++ b/Makefile	2018-03-29 18:52:36.671249450 -0700
+@@ -141,6 +141,8 @@
+ 
+ all: $(SHARED_LIBS) $(SHARED_PROGRAMS) $(STATIC_OUTDIR)/libleveldb.a $(STATIC_OUTDIR)/libmemenv.a $(STATIC_PROGRAMS)
+ 
++static: $(STATIC_OUTDIR)/libleveldb.a $(STATIC_OUTDIR)/libmemenv.a $(STATIC_PROGRAMS)
++
+ check: $(STATIC_PROGRAMS)
+ 	for t in $(notdir $(TESTS)); do echo "***** Running $$t"; $(STATIC_OUTDIR)/$$t || exit 1; done
+ 
