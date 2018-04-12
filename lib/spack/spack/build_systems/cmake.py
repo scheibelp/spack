@@ -157,6 +157,9 @@ class CMakePackage(PackageBase):
             # statically-linked binaries during the install phase
             args.append('-DCMAKE_BUILD_WITH_INSTALL_RPATH:BOOL=ON')
             #args.append('-DCMAKE_SKIP_BUILD_RPATH=TRUE')
+            args.append('-DCMAKE_FIND_LIBRARY_SUFFIXES:STRING=.a')
+            args.append('-DCMAKE_EXE_LINKER_FLAGS:STRING=-static')
+            args.append('-DBUILD_SHARED_LIBRARIES:BOOL=OFF')
 
         # CMake's find_package() looks in CMAKE_PREFIX_PATH first, help CMake
         # to find immediate link dependencies in right places:
