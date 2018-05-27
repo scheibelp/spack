@@ -25,9 +25,13 @@
 from __future__ import print_function
 
 import argparse
+import os
 
 import spack.cmd
 import spack.package
+import spack.cmd.env
+import spack.store
+import spack.repository
 import spack.cmd.common.arguments as arguments
 import spack.repo
 import spack.store
@@ -68,6 +72,11 @@ def setup_parser(subparser):
              " ALL versions of `libelf` are uninstalled. if no spec is "
              "supplied all installed software will be uninstalled. this "
              "is both useful and dangerous, like rm -r")
+
+    subparser.add_argument(
+        '-g', '--garbage', action='store_true', dest='garbage',
+        help="Uninstalls packages not currently concretized in "
+             "a Spack Environment.")
 
     subparser.add_argument(
         'packages',
@@ -193,9 +202,30 @@ def get_uninstall_list(args, specs):
     return uninstall_list
 
 
-def uninstall_specs(args, specs):
+def all_hashes():
+    """Returns a set of all the hashes installed on Spack"""
+    ret = set()
+    for spec in spack.store.db.query():
+        ret.add(spec.dag_hash())
+    return ret
 
-    uninstall_list = get_uninstall_list(args, specs)
+
+def uninstall_specs(args, specs):
+    uninstall_list = []
+    if args.garbage:
+        all = all_hashes()
+        env = spack.cmd.env.all_hashes()
+        garbage = all - env
+        if len(garbage) == 0 and not args.packages and not args.all:
+            tty.msg('All packages are used by at least one environment, '
+                    'no garbage to uninstall.')
+            return
+
+        garbage_specs = spack.cmd.parse_specs(
+            ['/' + x for x in garbage])
+        uninstall_list.extend(get_uninstall_list(args, garbage_specs))
+
+    uninstall_list.extend(get_uninstall_list(args, specs))
 
     if not uninstall_list:
         tty.warn('There are no package to uninstall.')
@@ -213,9 +243,10 @@ def uninstall_specs(args, specs):
 
 
 def uninstall(parser, args):
-    if not args.packages and not args.all:
+    if not args.packages and not args.all and not args.garbage:
         tty.die('uninstall requires at least one package argument.',
                 '  Use `spack uninstall --all` to uninstall ALL packages.')
 
     uninstall_specs(
-        args, spack.cmd.parse_specs(args.packages) if args.packages else [any])
+        args, spack.cmd.parse_specs(args.packages)
+        if args.packages or args.garbage else [any])
