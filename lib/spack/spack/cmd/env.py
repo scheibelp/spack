@@ -57,6 +57,30 @@ level = "long"
 _db_dirname = fs.join_path(spack.paths.var_path, 'environments')
 
 
+def env_names():
+    """Yields names of the environments in this Spack"""
+    envs = []
+    for fname in os.listdir(_db_dirname):
+        if os.path.isfile(
+            fs.join_path(_db_dirname, fname, '.env', 'environment.json')):
+                yield fname
+
+
+def all_hashes():
+    """Returns a set of all the hashes used by all environments"""
+    seen = set()
+    for env_name in spack.cmd.env.env_names():
+        env = spack.cmd.env.read(env_name)
+        for top_hash in env.concretized_order:
+            top_spec = env.specs_by_hash[top_hash]
+
+            for d, dep_spec in top_spec.traverse_edges(
+                    order='pre', cover='nodes', depth=True, deptypes=('build', 'link', 'run')):
+                node = dep_spec.spec
+                seen.add(node.dag_hash())
+    return seen
+
+
 def get_env_root(name):
     """Given an environment name, determines its root directory"""
     return fs.join_path(_db_dirname, name)
