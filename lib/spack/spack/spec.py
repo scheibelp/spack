@@ -2031,12 +2031,12 @@ class Spec(object):
                        self._expand_virtual_packages())
 
             changed = any(changes)
-            var_update, frontier = self.update_frontier(frontier, finished)
-            changed |= var_update
-            if not changed:
-                while frontier and not changed:
-                    var_update, frontier = self.update_frontier(frontier, finished)
-                    changed |= var_update
+            if frontier:
+                var_update, frontier = self.update_frontier(frontier, finished)
+                changed |= var_update
+            while frontier and not changed:
+                var_update, frontier = self.update_frontier(frontier, finished)
+                changed |= var_update
             force = True
 
         self._concretize_helper()

@@ -131,8 +131,8 @@ class Dealii(CMakePackage, CudaPackage):
     depends_on('cmake@:3.9.99',    when='@:8.99')
     # FIXME: concretizer bug. The two lines mimic what comes from PETSc
     # but we should not need it
-    depends_on('metis@5:+int64+real64',   when='+metis+int64')
-    depends_on('metis@5:~int64+real64',   when='+metis~int64')
+    depends_on('metis@5:+real64', when='+metis')
+    depends_on('metis+int64', when='+metis+int64')
     depends_on('nanoflann',        when='@9.0:+nanoflann')
     depends_on('netcdf+mpi',       when='+netcdf+mpi')
     depends_on('netcdf-cxx',       when='+netcdf+mpi')
@@ -147,12 +147,13 @@ class Dealii(CMakePackage, CudaPackage):
     depends_on('slepc@:3.6.3',     when='@:8.4.1+slepc+petsc+mpi')
     depends_on('slepc~arpack',     when='+slepc+petsc+mpi+int64')
     depends_on('sundials~pthread', when='@9.0:+sundials')
-    depends_on('trilinos+amesos+aztec+epetra+ifpack+ml+muelu+rol+sacado+teuchos',       when='+trilinos+mpi~int64~cuda')
-    depends_on('trilinos+amesos+aztec+epetra+ifpack+ml+muelu+rol+sacado+teuchos~hypre', when='+trilinos+mpi+int64~cuda')
+
+    depends_on('trilinos+amesos+aztec+epetra+ifpack+ml+muelu+rol+sacado+teuchos', when='+trilinos')
+    depends_on('trilinos~hypre', when='+trilinos+int64')
+    depends_on('trilinos@master', when='+trilinos')
     # FIXME: temporary disable Tpetra when using CUDA due to
     # namespace "Kokkos::Impl" has no member "cuda_abort"
-    depends_on('trilinos@master+amesos+aztec+epetra+ifpack+ml+muelu+rol+sacado+teuchos~amesos2~ifpack2~intrepid2~kokkos~tpetra~zoltan2',       when='+trilinos+mpi~int64+cuda')
-    depends_on('trilinos@master+amesos+aztec+epetra+ifpack+ml+muelu+rol+sacado+teuchos~hypre~amesos2~ifpack2~intrepid2~kokkos~tpetra~zoltan2', when='+trilinos+mpi+int64+cuda')
+    depends_on('trilinos~amesos2~ifpack2~intrepid2~kokkos~tpetra~zoltan2', when='+trilinos+cuda')
 
     # check that the combination of variants makes sense
     # 64-bit BLAS:
