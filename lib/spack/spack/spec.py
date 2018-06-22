@@ -1830,18 +1830,9 @@ class Spec(object):
         if self._concrete:
             return
 
-        changed = True
-        force = False
-
         user_spec_deps = self.flat_dependencies(copy=False)
 
-        while changed:
-            changes = (self.normalize(force, tests=tests,
-                                      user_spec_deps=user_spec_deps),
-                       self._expand_virtual_packages(),
-                       self._concretize_helper())
-            changed = any(changes)
-            force = True
+        self.concretization_algorithm1(user_spec_deps, do_tests=tests)
 
         visited_user_specs = set()
         for dep in self.traverse():
@@ -1990,6 +1981,21 @@ class Spec(object):
             # inconsistent specs like this on the command line: the
             # parser doesn't allow it. Spack must be broken!
             raise InconsistentSpecError("Invalid Spec DAG: %s" % e.message)
+
+    def concretization_algorithm1(self, user_spec_deps, do_tests):
+        changed = True
+        force = False
+
+        while changed:
+            changes = (self.normalize(force, tests=do_tests,
+                                      user_spec_deps=user_spec_deps),
+                       self._expand_virtual_packages(),
+                       self._concretize_helper())
+            changed = any(changes)
+            force = True
+
+    def concretization_algorithm2(self, user_spec_deps, do_tests):
+        pass
 
     def index(self, deptype='all'):
         """Return DependencyMap that points to all the dependencies in this
