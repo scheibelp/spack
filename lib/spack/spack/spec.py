@@ -2010,7 +2010,8 @@ class Spec(object):
         concretizer = spack.concretize.concretizer
 
         candidate, the_rest = self.get_top(frontier)
-        var_update = concretizer.concretize_variants(candidate)
+        var_update = concretizer.concretize_version(candidate)
+        var_update |= concretizer.concretize_variants(candidate)
         finished.add(candidate)
         new_frontier = set()
         for dep in self.traverse():

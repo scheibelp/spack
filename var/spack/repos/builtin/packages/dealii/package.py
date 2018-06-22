@@ -150,10 +150,9 @@ class Dealii(CMakePackage, CudaPackage):
 
     depends_on('trilinos+amesos+aztec+epetra+ifpack+ml+muelu+rol+sacado+teuchos', when='+trilinos')
     depends_on('trilinos~hypre', when='+trilinos+int64')
-    depends_on('trilinos@master', when='+trilinos')
     # FIXME: temporary disable Tpetra when using CUDA due to
     # namespace "Kokkos::Impl" has no member "cuda_abort"
-    depends_on('trilinos~amesos2~ifpack2~intrepid2~kokkos~tpetra~zoltan2', when='+trilinos+cuda')
+    depends_on('trilinos@master~amesos2~ifpack2~intrepid2~kokkos~tpetra~zoltan2', when='+trilinos+cuda')
 
     # check that the combination of variants makes sense
     # 64-bit BLAS:
