@@ -1832,7 +1832,7 @@ class Spec(object):
 
         user_spec_deps = self.flat_dependencies(copy=False)
 
-        self.concretization_algorithm1(user_spec_deps, do_tests=tests)
+        self.concretization_algorithm2(user_spec_deps, do_tests=tests)
 
         visited_user_specs = set()
         for dep in self.traverse():
@@ -1994,8 +1994,52 @@ class Spec(object):
             changed = any(changes)
             force = True
 
+    def get_top(self, specs):
+        L = list(specs)
+        for i in range(len(L)):
+            candidate = L[i]
+            if candidate.virtual:
+                continue
+            the_rest = L[:i] + L[i+1:]
+            if not any(candidate in x for x in the_rest):
+                return candidate, the_rest
+        raise ValueError("This shouldn't happen")
+
+    def update_frontier(self, frontier, finished):
+        import spack.concretize
+        concretizer = spack.concretize.concretizer
+
+        candidate, the_rest = self.get_top(frontier)
+        var_update = concretizer.concretize_variants(candidate)
+        finished.add(candidate)
+        new_frontier = set()
+        for dep in self.traverse():
+            if dep not in finished:
+                new_frontier.add(dep)
+        return var_update, new_frontier
+
     def concretization_algorithm2(self, user_spec_deps, do_tests):
-        pass
+        changed = True
+        force = False
+
+        finished = set([self])
+        frontier = list([self])
+
+        while changed:
+            changes = (self.normalize(force, tests=do_tests,
+                                      user_spec_deps=user_spec_deps),
+                       self._expand_virtual_packages())
+
+            changed = any(changes)
+            var_update, frontier = self.update_frontier(frontier, finished)
+            changed |= var_update
+            if not changed:
+                while frontier and not changed:
+                    var_update, frontier = self.update_frontier(frontier, finished)
+                    changed |= var_update
+            force = True
+
+        self._concretize_helper()
 
     def index(self, deptype='all'):
         """Return DependencyMap that points to all the dependencies in this
