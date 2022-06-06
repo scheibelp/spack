@@ -35,7 +35,83 @@ def _extract_primary_generator(generator):
     return primary_generator
 
 
-class CMakePackage(PackageBase):
+# This class would be a superclass of Package, and each build system class
+# like CMakePackage (the latter of which remains for backwards compatibility)
+class SystemAndPhaseMixin(PackageBase):
+    #Each package either (a) inherits from a build system package or (b)
+    #defines this variant (it shouldn't actually be defined in this class)
+    #variant('build_system', values=('cmake', 'autotools', 'waf'))
+
+    def system(object):
+        build_systems = {
+            'cmake': BuildWithCMake,
+            # ... and so on, one for each build system name
+        }
+        if not self._system:
+            name = self.variants['build_system'].value
+
+        return self._system
+
+    @property
+    def phases(self):
+        if not hasattr(self, 'phases'):
+            return system.phases
+        else:
+            return self.phases
+
+    def __getattr__(self, name):
+        if name in self.phases:
+            return getattr(self.system, name)
+        # If it couldn't be found on the package or package.system, then it's
+        # missing
+        raise AttributeError()
+
+
+class CMakePackage(SystemAndPhaseMixin, CMakeDependencies):
+    #: Phases of a CMake package
+    phases = ['cmake', 'build', 'install']
+
+    # Override the variant: only one build system is supported
+    variant('build_system', values=('cmake',))
+
+    @property
+    def system(self):
+        return BuildWithCMake(self)
+
+
+class CMakeDependencies(object):
+    with when('build_system=cmake'):
+        if sys.platform == 'win32':
+            generator = "Ninja"
+            depends_on('ninja')
+
+        # https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html
+        variant('build_type', default='RelWithDebInfo',
+                description='CMake build type',
+                values=('Debug', 'Release', 'RelWithDebInfo', 'MinSizeRel'))
+
+        # https://cmake.org/cmake/help/latest/variable/CMAKE_INTERPROCEDURAL_OPTIMIZATION.html
+        variant('ipo', default=False,
+                description='CMake interprocedural optimization')
+        # CMAKE_INTERPROCEDURAL_OPTIMIZATION only exists for CMake >= 3.9
+        conflicts('+ipo', when='^cmake@:3.8',
+                  msg='+ipo is not supported by CMake < 3.9')
+
+        depends_on('cmake', type='build')
+
+
+class BuildWith(object):
+    def __init__(self, package):
+        self.package = package
+
+    def __getattr__(self, name):
+        # BuildWith objects can access properties of the stored package as if
+        # they belong to them, but can also override them (__getattr__ is only
+        # called if the BuildWith class does not have the 'name' property)
+        return getattr(package, name)
+
+
+class BuildWithCMake(BuildWith):
     """Specialized class for packages built using CMake
 
     For more information on the CMake build system, see:
@@ -95,24 +171,6 @@ class CMakePackage(PackageBase):
     #: for more information.
 
     generator = "Unix Makefiles"
-
-    if sys.platform == 'win32':
-        generator = "Ninja"
-        depends_on('ninja')
-
-    # https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html
-    variant('build_type', default='RelWithDebInfo',
-            description='CMake build type',
-            values=('Debug', 'Release', 'RelWithDebInfo', 'MinSizeRel'))
-
-    # https://cmake.org/cmake/help/latest/variable/CMAKE_INTERPROCEDURAL_OPTIMIZATION.html
-    variant('ipo', default=False,
-            description='CMake interprocedural optimization')
-    # CMAKE_INTERPROCEDURAL_OPTIMIZATION only exists for CMake >= 3.9
-    conflicts('+ipo', when='^cmake@:3.8',
-              msg='+ipo is not supported by CMake < 3.9')
-
-    depends_on('cmake', type='build')
 
     @property
     def archive_files(self):
