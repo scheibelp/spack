@@ -60,6 +60,9 @@ class SystemAndPhaseMixin(PackageBase):
             return self.phases
 
     def __getattr__(self, name):
+        # __getattr__ is only called if the object has no property with the
+        # requested name (in this case, that means there is no method named
+        # after a listed phase)
         if name in self.phases:
             return getattr(self.system, name)
         # If it couldn't be found on the package or package.system, then it's
