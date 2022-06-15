@@ -61,12 +61,12 @@ class SystemAndPhaseMixin(PackageBase):
 
     def __getattr__(self, name):
         # __getattr__ is only called if the object has no property with the
-        # requested name (in this case, that means there is no method named
-        # after a listed phase)
-        if name in self.phases:
+        # requested name
+        if name in self.system.__dict__:
+            # This and system point to each other, so only access the property
+            # via .system if it is defined there directly (avoid infinite
+            # recursion)
             return getattr(self.system, name)
-        # If it couldn't be found on the package or package.system, then it's
-        # missing
         raise AttributeError()
 
 
@@ -111,9 +111,16 @@ class BuildWith(object):
         # BuildWith objects can access properties of the stored package as if
         # they belong to them, but can also override them (__getattr__ is only
         # called if the BuildWith class does not have the 'name' property)
-        return getattr(package, name)
+        if name in self.package.__dict__:
+            # This and .package point to each other, so only access the
+            # property via .package if it is defined there directly
+            return getattr(self.package, name)
+        raise AttributeError()
 
-
+# Every method here should have a wrapper that allows the Package using this
+# to override methods. The most sensible example for CMake is cmake_args:
+# users may want to define this themself in their package which subclasses
+# CMakePackage
 class BuildWithCMake(BuildWith):
     """Specialized class for packages built using CMake
 
