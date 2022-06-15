@@ -48,20 +48,17 @@ class SystemAndPhaseMixin(PackageBase):
             # ... and so on, one for each build system name
         }
         if not self._system:
-            name = self.variants['build_system'].value
+            build_system_ctor = self.variants['build_system'].value
+            self._system = build_system_ctor(self)
 
         return self._system
 
-    @property
-    def phases(self):
-        if not hasattr(self, 'phases'):
-            return system.phases
-        else:
-            return self.phases
-
     def __getattr__(self, name):
         # __getattr__ is only called if the object has no property with the
-        # requested name
+        # requested name generally this could be used for example so that
+        # installer.py can call Package.phase, and it will default to
+        # .system.phases (but if the user wants to override that then they
+        # can)
         if name in self.system.__dict__:
             # This and system point to each other, so only access the property
             # via .system if it is defined there directly (avoid infinite
