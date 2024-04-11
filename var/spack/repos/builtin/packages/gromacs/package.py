@@ -117,12 +117,8 @@ class Gromacs(CMakePackage, CudaPackage, ROCmPackage):
 
     variant("opencl", default=False, description="Enable OpenCL support")
     variant("sycl", default=False, when="@2021:", description="Enable SYCL support")
-    variant(
-        "sycl",
-        default=True,
-        when="@2022: +rocm",
-        description="Enable ROCm support when using SYCL",
-    )
+    depends_on("sycl", when="+sycl")
+
     variant(
         "intel-data-center-gpu-max",
         default=False,
@@ -293,8 +289,9 @@ class Gromacs(CMakePackage, CudaPackage, ROCmPackage):
 
     depends_on("cuda", when="+cuda")
     with when("+rocm"):
-        depends_on("sycl")
-        depends_on("hip")
+        # GROMACS <= 2024 uses SYCL for ROCm and specifically hipsycl
+        conflicts("~sycl", when="+rocm")
+        depends_on("hipsycl+rocm", when="+sycl")
         depends_on("rocfft", when="+rocfft")
 
     depends_on("lapack")
@@ -461,6 +458,7 @@ class CMakeBuilder(spack.build_systems.cmake.CMakeBuilder):
         # In other words, the mapping between package variants and the
         # GMX CMake variables is often non-trivial.
 
+        """
         gmx_cc = spack_cc
         gmx_cxx = spack_cxx
         if "+rocm" in self.spec:
@@ -475,6 +473,7 @@ class CMakeBuilder(spack.build_systems.cmake.CMakeBuilder):
                         "valid clang/amdclang executable, found invalid: "
                         "{0}/{1}".format(gmx_cc, gmx_cxx)
                     )
+        """
 
         if "+mpi" in self.spec:
             options.append("-DGMX_MPI:BOOL=ON")
@@ -499,8 +498,8 @@ class CMakeBuilder(spack.build_systems.cmake.CMakeBuilder):
             else:
                 options.extend(
                     [
-                        "-DCMAKE_C_COMPILER=%s" % gmx_cc,
-                        "-DCMAKE_CXX_COMPILER=%s" % gmx_cxx,
+                        #"-DCMAKE_C_COMPILER=%s" % gmx_cc,
+                        #"-DCMAKE_CXX_COMPILER=%s" % gmx_cxx,
                         "-DMPI_C_COMPILER=%s" % self.spec["mpi"].mpicc,
                         "-DMPI_CXX_COMPILER=%s" % self.spec["mpi"].mpicxx,
                     ]
@@ -508,8 +507,8 @@ class CMakeBuilder(spack.build_systems.cmake.CMakeBuilder):
         else:
             options.extend(
                 [
-                    "-DCMAKE_C_COMPILER=%s" % gmx_cc,
-                    "-DCMAKE_CXX_COMPILER=%s" % gmx_cxx,
+                    #"-DCMAKE_C_COMPILER=%s" % gmx_cc,
+                    #"-DCMAKE_CXX_COMPILER=%s" % gmx_cxx,
                     "-DGMX_MPI:BOOL=OFF",
                     "-DGMX_THREAD_MPI:BOOL=ON",
                 ]
@@ -517,7 +516,7 @@ class CMakeBuilder(spack.build_systems.cmake.CMakeBuilder):
 
         # Here we cannot use spack_cc because we need also libstdc++ to be reachable
         # Spack wrapper (spack_cc) hides includes/lib and CMake will fail
-        options.append("-DGMX_GPLUSPLUS_PATH=%s" % self.pkg.compiler.cxx)
+        #options.append("-DGMX_GPLUSPLUS_PATH=%s" % self.pkg.compiler.cxx)
 
         if self.spec.satisfies("%aocc"):
             options.append("-DCMAKE_CXX_FLAGS=--stdlib=libc++")
@@ -573,16 +572,9 @@ class CMakeBuilder(spack.build_systems.cmake.CMakeBuilder):
                 rocm_archs = ",".join(self.spec.variants["amdgpu_target"].value)
                 if self.pkg.version >= Version("2022") and self.pkg.version <= Version("2023"):
                     options.append("-DGMX_SYCL_HIPSYCL:BOOL=ON")
-                    hipsycl_dir = os.path.join(self.spec["sycl"].prefix.lib, "cmake/hipSYCL/")
-                    options.append(f"-Dhipsycl_DIR:STRING={hipsycl_dir}")
-                    options.append(f"-DHIPSYCL_TARGETS:STRING=hip:{rocm_archs}")
-                elif self.pkg.version >= Version("2024") and self.spec["sycl"].version <= Version(
-                    "23.10.0"
-                ):
+                elif self.pkg.version >= Version("2024"):
                     options.append("-DGMX_SYCL:BOOL=ACPP")
-                    hipsycl_dir = os.path.join(self.spec["sycl"].prefix.lib, "cmake/AdaptiveCpp/")
-                    options.append(f"-Dacpp_DIR:STRING={hipsycl_dir}")
-                    options.append(f"-DACPP_TARGETS:STRING=hip:{rocm_archs}")
+                options.extend(self.spec["hipsycl"].package.dependent_cmake_args(rocm_archs))
 
         if "+cuda" in self.spec:
             options.append("-DCUDA_TOOLKIT_ROOT_DIR:STRING=" + self.spec["cuda"].prefix)

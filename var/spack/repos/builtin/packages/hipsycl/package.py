@@ -5,13 +5,14 @@
 
 import json
 from os import path
+import pathlib
 
 from llnl.util import filesystem
 
 from spack.package import *
 
 
-class Hipsycl(CMakePackage, CudaPackage, ROCmPackage):
+class Hipsycl(CMakePackage):
     """hipSYCL is an implementation of the SYCL standard programming model
     over NVIDIA CUDA/AMD HIP"""
 
@@ -35,29 +36,35 @@ class Hipsycl(CMakePackage, CudaPackage, ROCmPackage):
     version("0.8.0", commit="2daf8407e49dd32ebd1c266e8e944e390d28b22a", submodules=True)
     version("develop", branch="develop", submodules=True)
 
+    variant("rocm", default=False)
+    variant("cuda", default=False)
     variant("opencl", default=False, description="Enable OpenCL backend for SYCL kernels")
     variant("sscp", default=False, description="Enable SSCP compiler")
     variant(
         "level_zero", default=False, description="Enable Intel Level Zero backend for SYCL kernels"
     )
 
+    depends_on("cuda", when="+cuda")
+    depends_on("hip", when="+rocm")
+
     depends_on("cmake@3.5:", type="build")
     depends_on("boost +filesystem", when="@:0.8")
     depends_on("boost@1.67.0:1.69.0 +filesystem +fiber +context cxxstd=17", when="@0.9.1:")
     depends_on("python@3:")
-    depends_on("llvm@8: +clang", when="~cuda")
-    depends_on("llvm@9: +clang", when="+cuda")
+    depends_on("libllvm@8:", when="~cuda")
+    depends_on("libllvm@9:", when="+cuda")
+    depends_on("llvm+clang", when="^llvm")
     # hipSYCL 0.8.0 supported only LLVM 8-10:
     # (https://github.com/AdaptiveCpp/AdaptiveCpp/blob/v0.8.0/CMakeLists.txt#L29-L37)
-    depends_on("llvm@8:10", when="@0.8.0")
+    depends_on("libllvm@8:10", when="@0.8.0")
     # https://github.com/OpenSYCL/OpenSYCL/pull/918 was introduced after 0.9.4
-    conflicts("^llvm@16:", when="@:0.9.4")
+    conflicts("^libllvm@16:", when="@:0.9.4")
     # LLVM PTX backend requires cuda7:10.1 (https://tinyurl.com/v82k5qq)
     depends_on("cuda@9:10.1", when="@0.8.1: +cuda ^llvm@9")
     depends_on("cuda@9:", when="@0.8.1: +cuda ^llvm@10:")
     # hipSYCL@:0.8.0 requires cuda@9:10.0 due to a known bug
     depends_on("cuda@9:10.0", when="@:0.8.0 +cuda")
-    depends_on("llvm@9: +clang", when="+rocm")
+    depends_on("libllvm@9: +clang", when="+rocm")
 
     conflicts(
         "%gcc@:4",
@@ -71,11 +78,23 @@ class Hipsycl(CMakePackage, CudaPackage, ROCmPackage):
     )
     conflicts(
         "^llvm build_type=Debug",
-        when="+cuda",
+        when="+cuda ^llvm",
         msg="LLVM debug builds don't work with hipSYCL CUDA backend; for "
         "further info please refer to: "
         "https://github.com/illuhad/hipSYCL/blob/master/doc/install-cuda.md",
     )
+
+    def dependent_cmake_args(self, rocm_archs):
+        options = []
+        if self.spec.version < Version("23.10.0"):
+            hipsycl_dir = path.join(self.spec.prefix.lib, "cmake/hipSYCL/")
+            options.append(f"-Dhipsycl_DIR:STRING={hipsycl_dir}")
+            options.append(f"-DHIPSYCL_TARGETS:STRING=hip:{rocm_archs}")
+        else:
+            hipsycl_dir = path.join(self.spec.prefix.lib, "cmake/AdaptiveCpp/")
+            options.append(f"-Dacpp_DIR:STRING={hipsycl_dir}")
+            options.append(f"-DACPP_TARGETS:STRING=hip:{rocm_archs}")
+        return options
 
     def cmake_args(self):
         spec = self.spec
@@ -94,7 +113,7 @@ class Hipsycl(CMakePackage, CudaPackage, ROCmPackage):
             args.append("-DACPP_VERSION_SUFFIX={0}".format(self.version))
         # LLVM directory containing all installed CMake files
         # (e.g.: configs consumed by client projects)
-        llvm_cmake_dirs = filesystem.find(spec["llvm"].prefix.lib, "LLVMExports.cmake")
+        llvm_cmake_dirs = filesystem.find(spec["libllvm"].prefix.lib, "LLVMExports.cmake")
         if len(llvm_cmake_dirs) != 1:
             raise InstallError(
                 "concretized llvm dependency must provide "
@@ -105,7 +124,7 @@ class Hipsycl(CMakePackage, CudaPackage, ROCmPackage):
 
         # clang internal headers directory
         llvm_clang_include_dirs = filesystem.find(
-            spec["llvm"].prefix.lib, "__clang_cuda_runtime_wrapper.h"
+            spec["libllvm"].prefix.lib, "__clang_cuda_runtime_wrapper.h"
         )
         if len(llvm_clang_include_dirs) != 1:
             raise InstallError(
@@ -117,11 +136,11 @@ class Hipsycl(CMakePackage, CudaPackage, ROCmPackage):
             "-DCLANG_INCLUDE_PATH:String={0}".format(path.dirname(llvm_clang_include_dirs[0]))
         )
         # Find the right LLVM compiler
-        llvm_clang_bin = path.join(spec["llvm"].prefix.bin, "clang")
-        llvm_clang_bin_cpp = path.join(spec["llvm"].prefix.bin, "clang++")
+        llvm_clang_bin = path.join(spec["libllvm"].prefix.bin, "clang")
+        llvm_clang_bin_cpp = path.join(spec["libllvm"].prefix.bin, "clang++")
         if not filesystem.is_exe(llvm_clang_bin):
-            llvm_clang_bin = path.join(spec["llvm"].prefix.bin, "amdclang")
-            llvm_clang_bin_cpp = path.join(spec["llvm"].prefix.bin, "amdclang++")
+            llvm_clang_bin = path.join(spec["libllvm"].prefix.bin, "amdclang")
+            llvm_clang_bin_cpp = path.join(spec["libllvm"].prefix.bin, "amdclang++")
             if not filesystem.is_exe(llvm_clang_bin):
                 raise InstallError(
                     "concretized LLVM dependency must provide a "
@@ -139,7 +158,7 @@ class Hipsycl(CMakePackage, CudaPackage, ROCmPackage):
             # FIXME: here spec["rocm"].prefix does not work
             # Instead (temporary solution: we use HIP prefix and
             # remove the "hip/" part of the path which is the ROCm path
-            rocm_path = path.split(spec["hip"].prefix[:-1])[0]
+            rocm_path = pathlib.Path(spec["hip"].prefix).parent
             args.append("-DROCM_PATH:String={0}".format(rocm_path))
 
         return args
@@ -181,7 +200,7 @@ class Hipsycl(CMakePackage, CudaPackage, ROCmPackage):
             #    ptx backend
             rpaths = set()
             so_paths = filesystem.find_libraries(
-                "libc++", self.spec["llvm"].prefix, shared=True, recursive=True
+                "libc++", self.spec["libllvm"].prefix, shared=True, recursive=True
             )
             if len(so_paths) != 1:
                 raise InstallError(
@@ -191,7 +210,7 @@ class Hipsycl(CMakePackage, CudaPackage, ROCmPackage):
                 )
             rpaths.add(path.dirname(so_paths[0]))
             so_paths = filesystem.find_libraries(
-                "libc++abi", self.spec["llvm"].prefix, shared=True, recursive=True
+                "libc++abi", self.spec["libllvm"].prefix, shared=True, recursive=True
             )
             if len(so_paths) != 1:
                 raise InstallError(
