@@ -141,15 +141,6 @@ class LmodConfiguration(BaseConfiguration):
         """
         tokens = configuration(self.name).get("hierarchy", [])
 
-        # Check if all the tokens in the hierarchy are virtual specs.
-        # If not warn the user and raise an error.
-        not_virtual = [t for t in tokens if t != "compiler" and not spack.repo.PATH.is_virtual(t)]
-        if not_virtual:
-            msg = "Non-virtual specs in 'hierarchy' list for lmod: {0}\n"
-            msg += "Please check the 'modules.yaml' configuration files"
-            msg = msg.format(", ".join(not_virtual))
-            raise NonVirtualInHierarchyError(msg)
-
         # Append 'compiler' which is always implied
         tokens.append("compiler")
 
@@ -209,7 +200,7 @@ class LmodConfiguration(BaseConfiguration):
 
         # All the other tokens in the hierarchy must be virtual dependencies
         for x in self.hierarchy_tokens:
-            if self.spec.package.provides(x):
+            if self.spec.package.provides(x) or self.spec.name == x:
                 provides[x] = self.spec[x]
         return provides
 
@@ -264,6 +255,7 @@ class LmodFileLayout(BaseFileLayout):
 
         # Get the list of requirements and build an **ordered**
         # list of the path parts
+        # import pdb; pdb.set_trace()
         requires = self.conf.requires
         hierarchy = self.conf.hierarchy_tokens
         path_parts = lambda x: self.token_to_path(x, requires[x])

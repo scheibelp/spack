@@ -311,9 +311,10 @@ class TestLmod:
         """
         module_configuration("non_virtual_in_hierarchy")
 
-        module, spec = factory(mpileaks_spec_string)
-        with pytest.raises(spack.modules.lmod.NonVirtualInHierarchyError):
-            module.write()
+        module, spec = factory("netlib-scalapack ^openblas")
+        path = module.layout.filename
+        import pdb; pdb.set_trace()
+        print("hi")
 
     def test_conflicts(self, modulefile_content, module_configuration):
         """Tests adding conflicts to the module."""
