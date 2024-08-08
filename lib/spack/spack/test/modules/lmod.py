@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
 import os
+import pathlib
 
 import pytest
 
@@ -313,8 +314,7 @@ class TestLmod:
 
         module, spec = factory("netlib-scalapack ^openblas")
         path = module.layout.filename
-        import pdb; pdb.set_trace()
-        print("hi")
+        assert any("openblas" in x for x in pathlib.Path(path).parts)
 
     def test_conflicts(self, modulefile_content, module_configuration):
         """Tests adding conflicts to the module."""
