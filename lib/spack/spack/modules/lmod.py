@@ -200,7 +200,7 @@ class LmodConfiguration(BaseConfiguration):
 
         # All the other tokens in the hierarchy must be virtual dependencies
         for x in self.hierarchy_tokens:
-            if self.spec.package.provides(x) or self.spec.name == x:
+            if self.spec.package.provides(x):
                 provides[x] = self.spec[x]
         return provides
 
@@ -255,7 +255,6 @@ class LmodFileLayout(BaseFileLayout):
 
         # Get the list of requirements and build an **ordered**
         # list of the path parts
-        # import pdb; pdb.set_trace()
         requires = self.conf.requires
         hierarchy = self.conf.hierarchy_tokens
         path_parts = lambda x: self.token_to_path(x, requires[x])
