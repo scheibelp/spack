@@ -149,6 +149,7 @@ class LmodConfiguration(BaseConfiguration):
 
         return tokens
 
+    # Seems fine
     @property
     @lang.memoized
     def requires(self):
@@ -200,7 +201,7 @@ class LmodConfiguration(BaseConfiguration):
 
         # All the other tokens in the hierarchy must be virtual dependencies
         for x in self.hierarchy_tokens:
-            if self.spec.package.provides(x):
+            if self.spec.package.provides(x) or self.spec.name == x:
                 provides[x] = self.spec[x]
         return provides
 
@@ -225,7 +226,7 @@ class LmodConfiguration(BaseConfiguration):
     @property
     def hidden(self):
         # Never hide a module that opens a hierarchy
-        if any(self.spec.package.provides(x) for x in self.hierarchy_tokens):
+        if any((self.spec.package.provides(x) or self.spec.name == x) for x in self.hierarchy_tokens):
             return False
         return super().hidden
 
@@ -364,6 +365,9 @@ class LmodFileLayout(BaseFileLayout):
         # Deduplicate the list
         unlocked[None] = list(lang.dedupe(unlocked[None]))
 
+        # TODO: "missing" are the things we do not require or provide
+        # so e.g. if mpi is a hierarchy token and we don't depend on
+        # mpi (or provide it), it is considered "missing"
         # Compute the combination of missing requirements: this will lead to
         # paths that are unlocked conditionally
         missing = self.conf.missing
