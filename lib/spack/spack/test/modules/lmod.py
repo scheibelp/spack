@@ -312,9 +312,9 @@ class TestLmod:
         """
         module_configuration("non_virtual_in_hierarchy")
 
-        module, spec = factory("netlib-scalapack ^openblas")
+        module, spec = factory("netlib-scalapack")
         path = module.layout.filename
-        assert any("openblas" in x for x in pathlib.Path(path).parts)
+        assert any("libdwarf" in x for x in pathlib.Path(path).parts)
 
     def test_conflicts(self, modulefile_content, module_configuration):
         """Tests adding conflicts to the module."""

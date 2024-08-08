@@ -5,7 +5,7 @@ lmod:
     - 'clang@3.3'
   hierarchy:
     - mpi
-    - openblas
+    - libdwarf
 
   all:
     autoload: direct

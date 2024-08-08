@@ -18,3 +18,6 @@ class NetlibScalapack(Package):
     depends_on("mpi")
     depends_on("lapack")
     depends_on("blas")
+    # A nonvirtual package, to test lmod hierarchies w/ nonvirtual
+    # components
+    depends_on("libdwarf")
