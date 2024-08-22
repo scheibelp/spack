@@ -3537,9 +3537,10 @@ class SpecBuilder:
             if spec.compiler in compilers:
                 flagmap_from_compiler = compilers[spec.compiler].flags
 
-            for flag_type in spec.compiler_flags.valid_compiler_flags():
-                node = SpecBuilder.make_node(pkg=spec.name)
+            node = SpecBuilder.make_node(pkg=spec.name)
+            topo_order = [s.name for s in spec.traverse(order="post", direction="parents")]
 
+            for flag_type in spec.compiler_flags.valid_compiler_flags():
                 ordered_flags = []
 
                 # 1. Put compiler flags first
@@ -3562,7 +3563,6 @@ class SpecBuilder:
                 # For flags that are applied by dependents, put flags from parents
                 # before children; we depend on the stability of traverse() to
                 # achieve a stable flag order for flags introduced in this manner.
-                topo_order = list(s.name for s in spec.traverse(order="post", direction="parents"))
                 lex_order = list(sorted(flag_groups))
 
                 def _order_index(flag_group):
