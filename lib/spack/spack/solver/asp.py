@@ -1040,7 +1040,7 @@ class ConstraintOrigin(enum.Enum):
 
     @staticmethod
     def append_suffix(pkg_id: str, kind: "ConstraintOrigin") -> str:
-        """Given a package identifier and a constraint type, generate a string ID."""
+        """Given a package identifier and a constraint kind, generate a string ID."""
         suffix = ConstraintOrigin._SUFFIXES()[kind]
         return f"{pkg_id}{suffix}"
 
@@ -1055,6 +1055,33 @@ class ConstraintOrigin(enum.Enum):
             if source.endswith(suffix):
                 return kind.value, source[: -len(suffix)]
         return -1, source
+
+    @staticmethod
+    def set_flag_source(*, source: str, kind: "ConstraintOrigin", callback=None):
+        def _wrapper(input_spec, requirements):
+            if callback:
+                requirements = callback(input_spec, requirements)
+
+            result = []
+            for fact in requirements:
+                if fact.args[0] == "node_flag" or fact.args[0] == "node_flag_set":
+                    new_args = fact.args[:-1] + (ConstraintOrigin.append_suffix(source, kind),)
+                    fact.args = new_args
+
+                elif (
+                    fact.args[0] == "propagate"
+                    and isinstance(fact.args[2], AspFunction)
+                    and fact.args[2].name == "node_flag"
+                ):
+                    new_args = fact.args[2].args[:-1] + (
+                        ConstraintOrigin.append_suffix(source, kind),
+                    )
+                    fact.args[2].args = new_args
+
+                result.append(fact)
+            return result
+
+        return _wrapper
 
 
 class SpackSolverSetup:
@@ -1432,7 +1459,7 @@ class SpackSolverSetup:
             return result[0]
 
         cond_id = next(self._id_counter)
-        requirements = self.spec_clauses(named_cond, body=body, source=source)
+        requirements = self.spec_clauses(named_cond, body=body)
         if transform:
             requirements = transform(named_cond, requirements)
         pkg_cache[named_cond_key] = (cond_id, requirements)
@@ -1447,7 +1474,6 @@ class SpackSolverSetup:
         msg: Optional[str] = None,
         transform_required: Optional[TransformFunction] = None,
         transform_imposed: Optional[TransformFunction] = remove_node,
-        source: Optional[str] = None,
     ):
         """Generate facts for a dependency or virtual provider condition.
 
@@ -1474,11 +1500,7 @@ class SpackSolverSetup:
 
             condition_id = next(self._id_counter)
             trigger_id = self._get_condition_id(
-                required_spec,
-                cache=self._trigger_cache,
-                body=True,
-                transform=transform_required,
-                source=source,
+                required_spec, cache=self._trigger_cache, body=True, transform=transform_required
             )
             self.gen.fact(fn.pkg_fact(required_spec.name, fn.condition(condition_id)))
             self.gen.fact(fn.condition_reason(condition_id, msg))
@@ -1489,11 +1511,7 @@ class SpackSolverSetup:
                 return condition_id
 
             effect_id = self._get_condition_id(
-                imposed_spec,
-                cache=self._effect_cache,
-                body=False,
-                transform=transform_imposed,
-                source=source,
+                imposed_spec, cache=self._effect_cache, body=False, transform=transform_imposed
             )
             self.gen.fact(
                 fn.pkg_fact(required_spec.name, fn.condition_effect(condition_id, effect_id))
@@ -1574,16 +1592,19 @@ class SpackSolverSetup:
                         if t & depflag
                     ]
 
+                fn_required = ConstraintOrigin.set_flag_source(
+                    callback=track_dependencies, source=pkg.name, kind=ConstraintOrigin.DEPENDS_ON
+                )
+                fn_imposed = ConstraintOrigin.set_flag_source(
+                    callback=dependency_holds, source=pkg.name, kind=ConstraintOrigin.DEPENDS_ON
+                )
                 self.condition(
                     cond,
                     dep.spec,
                     name=pkg.name,
                     msg=msg,
-                    transform_required=track_dependencies,
-                    transform_imposed=dependency_holds,
-                    source=ConstraintOrigin.append_suffix(
-                        pkg.name, ConstraintOrigin.DEPENDS_ON
-                    ),
+                    transform_required=fn_required,
+                    transform_imposed=fn_imposed,
                 )
 
                 self.gen.newline()
@@ -1667,15 +1688,18 @@ class SpackSolverSetup:
                     if virtual:
                         transform = None
 
+                    fn_imposed = ConstraintOrigin.set_flag_source(
+                        callback=transform, source=pkg_name, kind=ConstraintOrigin.REQUIRE
+                    )
                     member_id = self.condition(
                         required_spec=when_spec,
                         imposed_spec=spec,
                         name=pkg_name,
-                        transform_imposed=transform,
-                        msg=f"{input_spec} is a requirement for package {pkg_name}",
-                        source=ConstraintOrigin.append_suffix(
-                            pkg_name, ConstraintOrigin.REQUIRE
+                        transform_required=ConstraintOrigin.set_flag_source(
+                            kind=ConstraintOrigin.REQUIRE, source=pkg_name
                         ),
+                        transform_imposed=fn_imposed,
+                        msg=f"{input_spec} is a requirement for package {pkg_name}",
                     )
                 except Exception as e:
                     # Do not raise if the rule comes from the 'all' subsection, since usability
@@ -1845,7 +1869,6 @@ class SpackSolverSetup:
         expand_hashes: bool = False,
         concrete_build_deps=False,
         required_from: Optional[str] = None,
-        source: Optional[str] = None,
     ) -> List[AspFunction]:
         """Wrap a call to `_spec_clauses()` into a try/except block with better error handling.
 
@@ -1861,7 +1884,6 @@ class SpackSolverSetup:
                 transitive=transitive,
                 expand_hashes=expand_hashes,
                 concrete_build_deps=concrete_build_deps,
-                source=source,
             )
         except RuntimeError as exc:
             msg = str(exc)
@@ -1878,7 +1900,6 @@ class SpackSolverSetup:
         transitive: bool = True,
         expand_hashes: bool = False,
         concrete_build_deps: bool = False,
-        source: Optional[str] = None,
     ) -> List[AspFunction]:
         """Return a list of clauses for a spec mandates are true.
 
@@ -1977,16 +1998,15 @@ class SpackSolverSetup:
                 self.compiler_version_constraints.add(spec.compiler)
 
         # compiler flags
-        source = source or "none"
         for flag_type, flags in spec.compiler_flags.items():
             flag_group = " ".join(flags)
             for flag in flags:
-                clauses.append(f.node_flag(spec.name, flag_type, flag, flag_group, source))
+                clauses.append(f.node_flag(spec.name, flag_type, flag, flag_group, "none"))
                 if not spec.concrete and flag.propagate is True:
                     clauses.append(
                         f.propagate(
                             spec.name,
-                            fn.node_flag(flag_type, flag, flag_group, source),
+                            fn.node_flag(flag_type, flag, flag_group, "none"),
                             fn.edge_types("link", "run"),
                         )
                     )
@@ -3606,7 +3626,7 @@ class SpecBuilder:
                     extend_flag_list(ordered_flags, cmd_flags)
 
                 compiler_flags = spec.compiler_flags.get(flag_type, [])
-                msg = "%s does not equal %s" % (set(compiler_flags), set(ordered_flags))
+                msg = f"{set(compiler_flags)} does not equal {set(ordered_flags)}"
                 assert set(compiler_flags) == set(ordered_flags), msg
 
                 spec.compiler_flags.update({flag_type: ordered_flags})
