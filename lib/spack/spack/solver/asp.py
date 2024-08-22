@@ -1043,14 +1043,14 @@ class ConstraintOrigin:
     ]
 
     @staticmethod
-    def append_type_suffix(pkg_id: str, type: ConstraintOriginType):
+    def append_type_suffix(pkg_id: str, kind: ConstraintOriginType):
         """Given a package identifier and a constraint type, generate
         a string ID.
         """
         for k, v in ConstraintOrigin._src_id_suffix:
-            if type == k:
+            if kind == k:
                 return pkg_id + v
-        raise InternalConcretizerError(f"Improper source type: {type}")
+        raise InternalConcretizerError(f"Improper source type: {kind}")
 
     @staticmethod
     def strip_type_suffix(source: str):
