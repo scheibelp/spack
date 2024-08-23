@@ -1057,26 +1057,37 @@ class ConstraintOrigin(enum.Enum):
         return -1, source
 
     @staticmethod
-    def set_flag_source(*, source: str, kind: "ConstraintOrigin", callback=None):
+    def set_flag_source(*, source_pkg: str, kind: "ConstraintOrigin", wraps=None):
+        """Transform function for SpackSolverSetup.condition, that sets the source field
+        in node_flag/4.
+
+        Args:
+            source_pkg: the package from which the node_flag originates
+            kind: the kind of constraint
+            wraps: optional transformation to be wrapped
+        """
+        source_str = ConstraintOrigin.append_suffix(source_pkg, kind)
+
         def _wrapper(input_spec, requirements):
-            if callback:
-                requirements = callback(input_spec, requirements)
+            if wraps:
+                requirements = wraps(input_spec, requirements)
+
+            def _set_source(current_fact):
+                """Sets the source in a node_flag/4 fact"""
+                current_fact.args[2].args = current_fact.args[2].args[:-1] + (source_str,)
 
             result = []
             for fact in requirements:
-                if fact.args[0] == "node_flag" or fact.args[0] == "node_flag_set":
-                    new_args = fact.args[:-1] + (ConstraintOrigin.append_suffix(source, kind),)
-                    fact.args = new_args
-
-                elif (
-                    fact.args[0] == "propagate"
-                    and isinstance(fact.args[2], AspFunction)
-                    and fact.args[2].name == "node_flag"
-                ):
-                    new_args = fact.args[2].args[:-1] + (
-                        ConstraintOrigin.append_suffix(source, kind),
+                if (
+                    fact.args[0] == "node_flag"
+                    or fact.args[0] == "node_flag_set"
+                    or (
+                        fact.args[0] == "propagate"
+                        and isinstance(fact.args[2], AspFunction)
+                        and fact.args[2].name == "node_flag"
                     )
-                    fact.args[2].args = new_args
+                ):
+                    _set_source(fact)
 
                 result.append(fact)
             return result
@@ -1439,7 +1450,6 @@ class SpackSolverSetup:
         cache: ConditionSpecCache,
         body: bool,
         transform: Optional[TransformFunction] = None,
-        source: Optional[str] = None,
     ) -> int:
         """Get the id for one half of a condition (either a trigger or an imposed constraint).
 
@@ -1593,10 +1603,10 @@ class SpackSolverSetup:
                     ]
 
                 fn_required = ConstraintOrigin.set_flag_source(
-                    callback=track_dependencies, source=pkg.name, kind=ConstraintOrigin.DEPENDS_ON
+                    wraps=track_dependencies, source_pkg=pkg.name, kind=ConstraintOrigin.DEPENDS_ON
                 )
                 fn_imposed = ConstraintOrigin.set_flag_source(
-                    callback=dependency_holds, source=pkg.name, kind=ConstraintOrigin.DEPENDS_ON
+                    wraps=dependency_holds, source_pkg=pkg.name, kind=ConstraintOrigin.DEPENDS_ON
                 )
                 self.condition(
                     cond,
@@ -1688,16 +1698,17 @@ class SpackSolverSetup:
                     if virtual:
                         transform = None
 
+                    fn_required = ConstraintOrigin.set_flag_source(
+                        kind=ConstraintOrigin.REQUIRE, source_pkg=pkg_name
+                    )
                     fn_imposed = ConstraintOrigin.set_flag_source(
-                        callback=transform, source=pkg_name, kind=ConstraintOrigin.REQUIRE
+                        wraps=transform, source_pkg=pkg_name, kind=ConstraintOrigin.REQUIRE
                     )
                     member_id = self.condition(
                         required_spec=when_spec,
                         imposed_spec=spec,
                         name=pkg_name,
-                        transform_required=ConstraintOrigin.set_flag_source(
-                            kind=ConstraintOrigin.REQUIRE, source=pkg_name
-                        ),
+                        transform_required=fn_required,
                         transform_imposed=fn_imposed,
                         msg=f"{input_spec} is a requirement for package {pkg_name}",
                     )
@@ -1997,16 +2008,21 @@ class SpackSolverSetup:
                 )
                 self.compiler_version_constraints.add(spec.compiler)
 
+        def make_flag(*, kind, flag, group):
+            return fn.node_flag(kind, flag, group, "none")
+
         # compiler flags
         for flag_type, flags in spec.compiler_flags.items():
             flag_group = " ".join(flags)
             for flag in flags:
-                clauses.append(f.node_flag(spec.name, flag_type, flag, flag_group, "none"))
+                clauses.append(
+                    f.node_flag(spec.name, make_flag(kind=flag_type, flag=flag, group=flag_group))
+                )
                 if not spec.concrete and flag.propagate is True:
                     clauses.append(
                         f.propagate(
                             spec.name,
-                            fn.node_flag(flag_type, flag, flag_group, "none"),
+                            make_flag(kind=flag_type, flag=flag, group=flag_group),
                             fn.edge_types("link", "run"),
                         )
                     )
@@ -3485,8 +3501,10 @@ class SpecBuilder:
     def node_flag_compiler_default(self, node):
         self._flag_compiler_defaults.add(node)
 
-    def node_flag(self, node, flag_type, flag, flag_group, source):
-        self._specs[node].compiler_flags.add_flag(flag_type, flag, False, flag_group, source)
+    def node_flag(self, node, node_flag):
+        self._specs[node].compiler_flags.add_flag(
+            node_flag.flag_type, node_flag.flag, False, node_flag.flag_group, node_flag.source
+        )
 
     def external_spec_selected(self, node, idx):
         """This means that the external spec and index idx has been selected for this package."""
