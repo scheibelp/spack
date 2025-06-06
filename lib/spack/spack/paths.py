@@ -8,6 +8,7 @@ Do not import other ``spack`` modules here. This module is used
 throughout Spack and should bring in a minimal number of external
 dependencies.
 """
+import itertools
 import os
 import pathlib
 from collections import namedtuple
@@ -64,10 +65,12 @@ class Location_vars(Enum):
 
 
 # This is for tests that want to clean the environment of XDG_ variables that
-# affect spack behavior
+# affect spack behavior (and the corresponding SPACK_ overrides). Note that
+# these vars will affect .default_test_path for the running instance, but
+# the unit tests will not see the env vars
 def _unset_xdg_vars(env):
     saved = {}
-    for xdg_var in XDG_vars:
+    for xdg_var in itertools.chain(XDG_vars, XDG_overrides):
         if xdg_var.value in env:
             saved[xdg_var.value] = env.pop(xdg_var.value)
     return saved
