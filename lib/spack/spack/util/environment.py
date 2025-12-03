@@ -302,6 +302,9 @@ class NamePathModifier(NameValueModifier):
     ):
         super().__init__(name, str(value), separator=separator, trace=trace)
 
+    def __hash__(self):
+        return hash((self.name, self.value, self.separator))
+
 
 class SetEnv(NameValueModifier):
     __slots__ = ("force", "raw")
