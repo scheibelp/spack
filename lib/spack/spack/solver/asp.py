@@ -3425,6 +3425,13 @@ def possible_compilers(*, configuration) -> Tuple[Set["spack.spec.Spec"], Set["s
     for pkg_name in supported_compilers:
         result.update(spack.store.STORE.db.query(pkg_name))
 
+    # TODO: we should fail here if the "available" set is empty
+    tty.info(f"Available compilers: {str(result)}")
+    tty.info(f"Rejected compilers: {str(rejected)}")
+    tty.info(f"""\
+libc compat check? {using_libc_compatibility()}
+""")
+
     return result, rejected
 
 
