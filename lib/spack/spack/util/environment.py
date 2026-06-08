@@ -285,6 +285,9 @@ class NameValueModifier:
         """Apply the modification to the mapping passed as input"""
         raise NotImplementedError("must be implemented by derived classes")
 
+    def __hash__(self):
+        return hash((self.name, self.value, self.separator))
+
 
 class NamePathModifier(NameValueModifier):
     """Base class for modifiers that modify the value of an environment variable
@@ -301,9 +304,6 @@ class NamePathModifier(NameValueModifier):
         trace: Optional[Trace] = None,
     ):
         super().__init__(name, str(value), separator=separator, trace=trace)
-
-    def __hash__(self):
-        return hash((self.name, self.value, self.separator))
 
 
 class SetEnv(NameValueModifier):
