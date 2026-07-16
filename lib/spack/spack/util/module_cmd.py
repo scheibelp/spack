@@ -106,6 +106,13 @@ def load_module(mod):
     # Store the LOADEDMODULES before trying to load the new module
     loaded_modules_before = os.environ.get("LOADEDMODULES", "")
 
+    # Check if the module is already loaded
+    if loaded_modules_before:
+        loaded_list = loaded_modules_before.split(os.pathsep)
+        if mod in loaded_list:
+            # Module is already loaded, nothing to do
+            return
+
     # Load the module now that there are no conflicts
     # Some module systems use stdout and some use stderr
     module("load", mod)
